@@ -15,8 +15,8 @@
     --status-ok: #10b981; --status-warning: #f59e0b; --status-critical: #ef4444;
   }
   .nav-link.active { background-color: rgba(255,255,255,0.2); color: #BFEDF6; }
-  .pik-card { border-radius: 0.6rem; box-shadow: 0 1px 3px rgba(0,0,0,.12); transition: transform .15s ease; }
-  .pik-card.front { transform: translateY(-2px); box-shadow: 0 4px 10px rgba(3,74,119,.25); }
+  .pik-card { border-radius: 0.6rem; box-shadow: 0 1px 3px rgba(0,0,0,.12); transition: transform .15s ease; border-left: 4px solid #cbd5e1; background: #fff; }
+  .pik-card.front { transform: translateY(-2px); box-shadow: 0 4px 10px rgba(3,74,119,.25); border-left: 6px solid var(--status-ok); background: #ecfdf5; }
   .pik-card.marker-produccion  { background: var(--status-ok); color: #fff; }
   .pik-card.marker-cambio      { background: #e2e8f0; color: #1e293b; border: 2px dashed #94a3b8; }
   .slot-col { min-width: 200px; }
@@ -120,7 +120,7 @@
         </div>`;
     }
     return `
-      <div class="pik-card ${isFront ? 'front' : ''} px-3 py-2.5 bg-white border ${isFront ? 'border-[#339FC6]' : 'border-slate-200'}">
+      <div class="pik-card ${isFront ? 'front' : ''} px-3 py-2.5">
         ${isFront ? `<div class="text-[9px] font-black uppercase tracking-wider mb-1" style="color:var(--status-ok)">● En producción</div>` : ''}
         <p class="font-mono text-xs font-bold text-[#0B3A5B]">${t.noParte}</p>
         <p class="text-[9px] font-semibold text-slate-400">Sebango: ${t.sebango}</p>
@@ -137,23 +137,40 @@
       </div>`;
   }
 
+  function contarTarjetasReales(cola) {
+    return cola.filter(t => t.tipo !== 'cambio_modelo').length;
+  }
+
   function render() {
     const data = window.KANBAN_LANZADOR;
     document.getElementById('lz-linea').textContent = data.linea ?? '—';
     document.getElementById('lz-turno').textContent = data.turno ?? '—';
 
-    document.getElementById('lz-slots').innerHTML = (data.slots ?? []).map(slot => `
+    document.getElementById('lz-slots').innerHTML = (data.slots ?? []).map(slot => {
+      const restantes = contarTarjetasReales(slot.cola);
+      const headerBg = restantes === 0 ? 'var(--status-critical)' : (restantes === 1 ? 'var(--status-warning)' : 'var(--nc-dark)');
+      const aviso = restantes === 0
+        ? `<div class="flex items-center justify-center gap-1 py-6 rounded-lg" style="background:#fef2f2;color:var(--status-critical)">
+             <span class="material-symbols-outlined text-base">warning</span>
+             <span class="text-[10px] font-black uppercase">Sin tarjetas — riesgo de paro</span>
+           </div>`
+        : (restantes === 1
+          ? `<div class="flex items-center justify-center gap-1 py-1 mb-1 rounded" style="background:#fffbeb;color:#854d0e">
+               <span class="material-symbols-outlined text-sm">error</span>
+               <span class="text-[9px] font-black uppercase">Última tarjeta de esta cola</span>
+             </div>`
+          : '');
+      return `
       <div class="slot-col flex flex-col gap-2 shrink-0">
-        <div class="bg-[#0B3A5B] text-white text-center py-1.5 rounded-lg font-black text-xs uppercase tracking-widest">
+        <div class="text-white text-center py-1.5 rounded-lg font-black text-xs uppercase tracking-widest" style="background:${headerBg}">
           Prioridad ${slot.prioridad}
         </div>
         <div class="flex flex-col gap-2 overflow-y-auto">
-          ${slot.cola.length === 0
-            ? `<p class="text-center text-[10px] font-bold text-slate-300 uppercase py-6">Cola vacía</p>`
-            : slot.cola.map((t, i) => tarjetaHtml(t, slot.prioridad, i === 0)).join('')}
+          ${aviso}
+          ${slot.cola.length === 0 && restantes === 0 ? '' : slot.cola.map((t, i) => tarjetaHtml(t, slot.prioridad, i === 0)).join('')}
         </div>
-      </div>
-    `).join('');
+      </div>`;
+    }).join('');
   }
 
   render();

@@ -17,7 +17,7 @@
   .nav-link.active { background-color: rgba(255,255,255,0.2); color: #BFEDF6; }
   .rack-col { flex: 1 1 0; min-width: 215px; }
   .rack-slot { border-radius: 0.6rem; }
-  .rack-slot.ocupada { background: #fff; border: 1px solid var(--nc-accent); box-shadow: 0 1px 2px rgba(0,0,0,.08); }
+  .rack-slot.ocupada { background: #fff; border: 1px solid var(--nc-accent); border-left: 6px solid var(--nc-accent); box-shadow: 0 1px 2px rgba(0,0,0,.08); }
   .rack-slot.libre   { border: 1px dashed #cbd5e1; background: transparent; opacity: .5; }
 </style>
 </head>
@@ -159,13 +159,23 @@
     document.getElementById('rk-linea').textContent = data.linea ?? '—';
 
     document.getElementById('rk-cols').innerHTML = (data.modelos ?? []).map(modelo => {
+      const total = modelo.posiciones.length;
       const ocupadas = modelo.posiciones.filter(p => p.estado === 'ESPERANDO').length;
+      const riesgo = ocupadas === 0 ? 'critico' : (ocupadas / total <= 0.25 ? 'warning' : 'ok');
+      const pillColor = riesgo === 'critico' ? 'var(--status-critical)' : (riesgo === 'warning' ? 'var(--status-warning)' : 'var(--nc-dark)');
+      const aviso = riesgo === 'critico'
+        ? `<div class="flex items-center justify-center gap-1 py-3 mb-1 rounded-lg" style="background:#fef2f2;color:var(--status-critical)">
+             <span class="material-symbols-outlined text-base">warning</span>
+             <span class="text-[9px] font-black uppercase">Sin cajas esperando</span>
+           </div>`
+        : '';
       return `
         <div class="rack-col flex flex-col gap-2">
           <div class="flex justify-between items-baseline">
             <span class="font-mono font-black text-xs" style="color:var(--nc-dark)">${modelo.noParte}</span>
-            <span class="text-[9px] font-bold text-slate-400">${ocupadas}/${modelo.posiciones.length}</span>
+            <span class="text-[9px] font-black px-1.5 py-0.5 rounded-full text-white" style="background:${pillColor}">${ocupadas}/${total}</span>
           </div>
+          ${aviso}
           <div class="flex flex-col gap-1.5 overflow-y-auto">
             ${[...modelo.posiciones].reverse().map(p => slotHtml(modelo, p)).join('')}
           </div>

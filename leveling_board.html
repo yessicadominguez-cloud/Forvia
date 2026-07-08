@@ -18,8 +18,8 @@
   .lv-table { border-collapse: collapse; font-size: 10px; white-space: nowrap; }
   .lv-table th, .lv-table td { border: 1px solid #e2e8f0; padding: 3px 5px; text-align: center; }
   .lv-table thead th { background: var(--nc-light); font-weight: 800; text-transform: uppercase; font-size: 9px; }
-  .lv-cell-match     { background: #ecfdf5; color: #065f46; }
-  .lv-cell-mismatch  { background: #fffbeb; color: #92400e; }
+  .lv-cell-match     { background: #bbf7d0; color: #065f46; }
+  .lv-cell-mismatch  { background: #fef08a; color: #854d0e; }
   .lv-cell-current   { outline: 2px solid var(--nc-accent); outline-offset: -2px; }
   .tpa-input { width: 34px; border: none; text-align: center; background: transparent; font-family: inherit; font-size: 10px; font-weight: 700; }
   .tpa-input:focus { background: #fff; outline: 1px solid var(--nc-accent); }
@@ -163,9 +163,9 @@
 
   function escalacionBadge(f) {
     const nivel = f.nivelEscalacion ?? 0;
-    if (!nivel) return `<span class="text-[9px] font-black uppercase" style="color:var(--status-ok)">OK</span>`;
+    if (!nivel) return `<span class="text-[9px] font-black uppercase px-2 py-0.5 rounded-full text-white" style="background:var(--status-ok)">OK</span>`;
     const color = nivel >= 2 ? 'var(--status-critical)' : 'var(--status-warning)';
-    return `<span class="text-[9px] font-black uppercase" style="color:${color}" title="${f.escaladoA ?? ''}">Nivel ${nivel}</span>`;
+    return `<span class="text-[9px] font-black uppercase px-2 py-0.5 rounded-full text-white" style="background:${color}" title="${f.escaladoA ?? ''}">Nivel ${nivel}</span>`;
   }
 
   function render() {
