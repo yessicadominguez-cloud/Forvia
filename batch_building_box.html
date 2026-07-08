@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>NC Tech MES - Batch Building Box · Recolección</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans:wght@400;500;600;700;900&display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<style>
+  *, *::before, *::after { box-sizing: border-box; }
+  html, body { height: 100%; margin: 0; font-family: 'Noto Sans', sans-serif; background: #F0F4F8; color: #0B3A5B; }
+  :root {
+    --nc-dark: #0B3A5B; --nc-primary: #034A77; --nc-accent: #339FC6; --nc-light: #BFEDF6;
+    --status-ok: #10b981; --status-warning: #f59e0b; --status-critical: #ef4444;
+  }
+  .nav-link.active { background-color: rgba(255,255,255,0.2); color: #BFEDF6; }
+  .bbb-col { min-width: 160px; }
+  .bbb-row { border: 1px solid #e2e8f0; border-radius: 0.4rem; }
+  .bbb-row.pendiente { background: #f8fafc; color: #94a3b8; border-style: dashed; }
+  .bbb-row.retirada  { background: #BFEDF6; color: #0B3A5B; border-color: #339FC6; }
+  .bbb-row.surtida   { background: #e2e8f0; color: #64748b; text-decoration: line-through; }
+  .cutoff { border-top: 3px solid #ef4444 !important; position: relative; }
+  .cutoff::before {
+    content: '⟶ CAMBIO'; position: absolute; right: 4px; top: -9px; font-size: 7px; font-weight: 900;
+    color: #ef4444; background: #fff; padding: 0 3px; letter-spacing: 0.05em;
+  }
+</style>
+</head>
+<body>
+
+<header class="flex items-center justify-between gap-3 px-4 h-12 bg-[#0B3A5B] border-b border-slate-700 shadow-sm flex-shrink-0">
+  <img alt="NC Tech Logo" src="logo_nctech.png" class="h-8 w-auto object-contain flex-shrink-0"/>
+  <div class="flex-1 min-w-0 flex items-center justify-center gap-3 overflow-hidden whitespace-nowrap">
+    <span class="truncate" style="color:#BFEDF6;font-weight:700;font-size:0.6rem;letter-spacing:0.12em;text-transform:uppercase">Recolección Mizusumashi</span>
+    <div style="width:1px;height:22px;background:rgba(255,255,255,0.25)" class="shrink-0"></div>
+    <span class="truncate" style="color:#fff;font-weight:900;font-size:0.85rem;letter-spacing:0.2em;text-transform:uppercase">Batch Building Box</span>
+  </div>
+  <nav class="flex gap-1 flex-shrink-0">
+    <a href="leveling_board.html" class="nav-link px-3 py-1.5 rounded text-xs font-bold text-white hover:bg-white/10 transition">LEVELING</a>
+    <a href="lanzador.html" class="nav-link px-3 py-1.5 rounded text-xs font-bold text-white hover:bg-white/10 transition">LANZADOR</a>
+    <a href="tablero_rack.html" class="nav-link px-3 py-1.5 rounded text-xs font-bold text-white hover:bg-white/10 transition">RACK</a>
+    <a href="batch_building_box.html" class="nav-link active px-3 py-1.5 rounded text-xs font-bold text-white hover:bg-white/10 transition">BATCH BOX</a>
+  </nav>
+</header>
+
+<main class="p-3" style="height:calc(100vh - 3rem)">
+  <div class="flex flex-col gap-3 h-full">
+
+    <div class="flex justify-between items-center shrink-0 gap-3 flex-wrap">
+      <div class="flex items-center gap-3">
+        <div class="bg-red-700 text-white px-6 py-1.5 font-black text-sm tracking-widest shrink-0"
+             style="clip-path:polygon(8px 0,100% 0,calc(100% - 8px) 100%,0 100%)">
+          BATCH BUILDING BOX
+        </div>
+        <div>
+          <p id="bbb-linea" class="text-[10px] font-bold text-slate-400 uppercase tracking-wider">—</p>
+          <p class="text-xs font-bold text-[#0B3A5B]">Formador de Lotes</p>
+        </div>
+      </div>
+      <div class="flex gap-2 items-center bg-white px-3 py-2 rounded-xl shadow-sm border border-slate-200 text-[9px] font-bold flex-wrap">
+        <span class="text-slate-400 uppercase tracking-wider">Leyenda</span>
+        <span class="text-slate-200">|</span>
+        <div class="flex items-center gap-1.5"><span class="w-3 h-3 rounded-sm inline-block border border-dashed border-slate-300 bg-slate-50"></span>PENDIENTE</div>
+        <span class="text-slate-200">|</span>
+        <div class="flex items-center gap-1.5"><span class="w-3 h-3 rounded-sm inline-block" style="background:#BFEDF6;border:1px solid #339FC6"></span>RETIRADA (fuera de línea)</div>
+        <span class="text-slate-200">|</span>
+        <div class="flex items-center gap-1.5"><span class="w-3 h-3 rounded-sm inline-block bg-slate-300"></span>SURTIDA a TSA/POOL</div>
+        <span class="text-slate-200">|</span>
+        <div class="flex items-center gap-1.5"><span style="color:#ef4444;font-weight:900">⟶</span>Corte de cambio de modelo</div>
+      </div>
+    </div>
+
+    <div id="bbb-cols" class="flex gap-3 overflow-x-auto flex-grow bg-white rounded-xl border border-slate-200 shadow-sm p-3" style="min-height:0"></div>
+  </div>
+</main>
+
+<script>
+  // ── Datos de fallback (usados cuando el servidor no responde) ─────────────────
+  window.KANBAN_BATCH = {
+    linea: "L-20 EM",
+    modelos: [
+      { modeloId: 1, noParte: "A7911-205-06", filaCambioModelo: 7,
+        filas: Array.from({length: 14}, (_, i) => {
+          const n = i + 1;
+          const estado = n <= 4 ? 'SURTIDA' : (n <= 7 ? 'RETIRADA' : 'PENDIENTE');
+          return { numero: n, estado, tarjeta: estado === 'PENDIENTE' ? null : { tarjetaId: `A7911-205-06-${String(n).padStart(2,'0')}`, tarjetaNum: n, tarjetaTotal: 14 } };
+        }) },
+      { modeloId: 2, noParte: "A3289-742-01", filaCambioModelo: 10,
+        filas: Array.from({length: 10}, (_, i) => {
+          const n = i + 1;
+          const estado = n <= 2 ? 'SURTIDA' : (n <= 5 ? 'RETIRADA' : 'PENDIENTE');
+          return { numero: n, estado, tarjeta: estado === 'PENDIENTE' ? null : { tarjetaId: `A3289-742-01-${String(n).padStart(2,'0')}`, tarjetaNum: n, tarjetaTotal: 10 } };
+        }) },
+      { modeloId: 3, noParte: "A9442-834-00", filaCambioModelo: 8,
+        filas: Array.from({length: 8}, (_, i) => ({ numero: i + 1, estado: 'PENDIENTE', tarjeta: null })) },
+      { modeloId: 4, noParte: "A7460-314-06", filaCambioModelo: 6,
+        filas: Array.from({length: 6}, (_, i) => {
+          const n = i + 1;
+          const estado = n <= 3 ? 'RETIRADA' : 'PENDIENTE';
+          return { numero: n, estado, tarjeta: estado === 'PENDIENTE' ? null : { tarjetaId: `A7460-314-06-${String(n).padStart(2,'0')}`, tarjetaNum: n, tarjetaTotal: 6 } };
+        }) }
+    ]
+  };
+
+  const BBB_API_GET  = '/kanban/batch/get';
+  const BBB_API_POST = '/kanban/batch/post';
+
+  async function cargarDesdeServidor() {
+    try {
+      const res = await fetch(BBB_API_GET, { method: 'GET', headers: { 'Accept': 'application/json' } });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const data = await res.json();
+      if (data && typeof data === 'object') window.KANBAN_BATCH = data;
+    } catch (e) {
+      console.warn('[BatchBuildingBox] Servidor no disponible, usando datos locales:', e.message);
+    }
+    render();
+  }
+
+  async function retirarTarjeta(modeloId, numeroFila) {
+    const modelo = window.KANBAN_BATCH.modelos.find(m => m.modeloId === modeloId);
+    const fila = modelo?.filas.find(f => f.numero === numeroFila);
+    if (fila && fila.estado === 'PENDIENTE') {
+      fila.estado = 'RETIRADA';
+      fila.tarjeta = { tarjetaId: `${modelo.noParte}-${String(numeroFila).padStart(2,'0')}`, tarjetaNum: numeroFila, tarjetaTotal: modelo.filas.length };
+    }
+    render();
+    try {
+      await fetch(BBB_API_POST, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ accion: 'retirar_tarjeta', modeloId, numeroFila, timestamp: new Date().toISOString() })
+      });
+    } catch (e) {
+      console.warn('[BatchBuildingBox.retirarTarjeta]', e.message);
+    }
+  }
+
+  function filaHtml(modelo, fila) {
+    const cls = fila.estado.toLowerCase();
+    const isCutoff = fila.numero === modelo.filaCambioModelo;
+    const clickable = fila.estado === 'PENDIENTE';
+    return `
+      <div class="bbb-row ${cls} ${isCutoff ? 'cutoff' : ''} px-2 py-1.5 flex items-center justify-between gap-2 text-[10px] font-bold ${clickable ? 'cursor-pointer hover:brightness-95' : ''}"
+           ${clickable ? `onclick="retirarTarjeta(${modelo.modeloId}, ${fila.numero})"` : ''}>
+        <span>${fila.numero}</span>
+        <span class="font-mono">${fila.tarjeta ? `${fila.tarjeta.tarjetaNum}/${fila.tarjeta.tarjetaTotal}` : '—'}</span>
+      </div>`;
+  }
+
+  function render() {
+    const data = window.KANBAN_BATCH;
+    document.getElementById('bbb-linea').textContent = data.linea ?? '—';
+
+    document.getElementById('bbb-cols').innerHTML = (data.modelos ?? []).map(modelo => `
+      <div class="bbb-col flex flex-col gap-2 shrink-0">
+        <div class="bg-[#0B3A5B] text-white text-center py-1.5 rounded-lg font-black text-[11px] uppercase tracking-wider font-mono">
+          ${modelo.noParte}
+        </div>
+        <div class="flex flex-col gap-1 overflow-y-auto">
+          ${modelo.filas.map(f => filaHtml(modelo, f)).join('')}
+        </div>
+      </div>
+    `).join('');
+  }
+
+  render();
+  setInterval(cargarDesdeServidor, 5000);
+</script>
+
+</body>
+</html>

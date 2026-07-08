@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>NC Tech MES - Tablero de Rack · Recolección</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans:wght@400;500;600;700;900&display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<style>
+  *, *::before, *::after { box-sizing: border-box; }
+  html, body { height: 100%; margin: 0; font-family: 'Noto Sans', sans-serif; background: #F0F4F8; color: #0B3A5B; }
+  :root {
+    --nc-dark: #0B3A5B; --nc-primary: #034A77; --nc-accent: #339FC6; --nc-light: #BFEDF6;
+    --status-ok: #10b981; --status-warning: #f59e0b; --status-critical: #ef4444;
+  }
+  .nav-link.active { background-color: rgba(255,255,255,0.2); color: #BFEDF6; }
+  .cards-grid-container { display: flex; flex-direction: column; gap: 0.4rem; }
+  .card-item { flex: 1; min-height: 0; }
+</style>
+</head>
+<body>
+
+<header class="flex items-center justify-between gap-3 px-4 h-12 bg-[#0B3A5B] border-b border-slate-700 shadow-sm flex-shrink-0">
+  <img alt="NC Tech Logo" src="logo_nctech.png" class="h-8 w-auto object-contain flex-shrink-0"/>
+  <div class="flex-1 min-w-0 flex items-center justify-center gap-3 overflow-hidden whitespace-nowrap">
+    <span class="truncate" style="color:#BFEDF6;font-weight:700;font-size:0.6rem;letter-spacing:0.12em;text-transform:uppercase">Recolección Mizusumashi</span>
+    <div style="width:1px;height:22px;background:rgba(255,255,255,0.25)" class="shrink-0"></div>
+    <span class="truncate" style="color:#fff;font-weight:900;font-size:0.85rem;letter-spacing:0.2em;text-transform:uppercase">Tablero de Rack</span>
+  </div>
+  <nav class="flex gap-1 flex-shrink-0">
+    <a href="leveling_board.html" class="nav-link px-3 py-1.5 rounded text-xs font-bold text-white hover:bg-white/10 transition">LEVELING</a>
+    <a href="lanzador.html" class="nav-link px-3 py-1.5 rounded text-xs font-bold text-white hover:bg-white/10 transition">LANZADOR</a>
+    <a href="tablero_rack.html" class="nav-link active px-3 py-1.5 rounded text-xs font-bold text-white hover:bg-white/10 transition">RACK</a>
+    <a href="batch_building_box.html" class="nav-link px-3 py-1.5 rounded text-xs font-bold text-white hover:bg-white/10 transition">BATCH BOX</a>
+  </nav>
+</header>
+
+<main class="p-3" style="height:calc(100vh - 3rem)">
+  <div class="grid grid-cols-12 gap-3 h-full overflow-hidden">
+
+    <div class="col-span-3 flex flex-col gap-3 overflow-hidden">
+      <div class="bg-white rounded-xl border border-slate-200 shadow-sm px-4 py-3 shrink-0">
+        <label class="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-1.5">Modelo</label>
+        <div class="relative">
+          <select id="rk-modelo-select" onchange="onModeloChange(this.value)"
+            class="w-full border border-slate-300 rounded-lg pl-3 pr-8 py-2 text-sm font-semibold text-[#0B3A5B] focus:border-[#339FC6] focus:ring-2 focus:ring-[#339FC6]/20 outline-none transition-all appearance-none bg-white">
+          </select>
+          <div class="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-slate-400">
+            <span class="material-symbols-outlined text-[18px]">expand_more</span>
+          </div>
+        </div>
+      </div>
+
+      <div id="rk-summary" class="bg-white rounded-xl border border-slate-200 shadow-sm p-5 shrink-0"></div>
+
+      <div class="bg-[#0B3A5B] text-white p-4 rounded-xl shadow-sm shrink-0">
+        <h3 class="text-[10px] font-bold uppercase tracking-widest opacity-60 mb-3">Leyenda</h3>
+        <div class="space-y-2 text-[10px]">
+          <div class="flex items-center justify-between border-b border-white/10 pb-2">
+            <div class="flex items-center gap-2"><div class="w-3 h-3 rounded-full" style="background:var(--status-accent, #339FC6)"></div><span>ESPERANDO SURTIR</span></div>
+          </div>
+          <div class="flex items-center justify-between">
+            <div class="flex items-center gap-2"><div class="w-3 h-3 rounded-full border border-white/30"></div><span>LIBRE</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="col-span-9 bg-white rounded-xl border border-slate-200 shadow-sm p-4 h-full overflow-hidden flex flex-col">
+      <div class="flex justify-between items-center mb-2 px-1 shrink-0">
+        <h3 class="text-xs font-bold text-slate-400 uppercase tracking-wider">Cajas en Rack — Secuencia LIFO</h3>
+        <span class="text-[10px] text-[#339FC6] font-bold">Esperando surtir</span>
+      </div>
+      <div id="rk-posiciones" class="cards-grid-container flex-grow overflow-y-auto"></div>
+    </div>
+  </div>
+</main>
+
+<script>
+  // ── Datos de fallback (usados cuando el servidor no responde) ─────────────────
+  window.KANBAN_RACK = {
+    linea: "L-20 EM",
+    modelos: [
+      { modeloId: 1, noParte: "A7911-205-06", posiciones: Array.from({length: 8}, (_, i) => {
+          const p = i + 1;
+          return p <= 3
+            ? { posicion: p, estado: 'ESPERANDO', tarjeta: { tarjetaId: `A7911-205-06-0${p}`, sebango: 'R3MF1-01', cantidad: 40, tarjetaNum: p, tarjetaTotal: 14 } }
+            : { posicion: p, estado: 'LIBRE', tarjeta: null };
+        }) },
+      { modeloId: 2, noParte: "A3289-742-01", posiciones: Array.from({length: 6}, (_, i) => {
+          const p = i + 1;
+          return p <= 5
+            ? { posicion: p, estado: 'ESPERANDO', tarjeta: { tarjetaId: `A3289-742-01-0${p}`, sebango: 'R3MF1-02', cantidad: 32, tarjetaNum: p, tarjetaTotal: 10 } }
+            : { posicion: p, estado: 'LIBRE', tarjeta: null };
+        }) },
+      { modeloId: 3, noParte: "A9442-834-00", posiciones: Array.from({length: 6}, (_, i) => ({ posicion: i + 1, estado: 'LIBRE', tarjeta: null })) }
+    ]
+  };
+
+  const RK_API_GET  = '/kanban/rack/get';
+  const RK_API_POST = '/kanban/rack/post';
+  let currentModeloId = 1;
+
+  async function cargarDesdeServidor() {
+    try {
+      const res = await fetch(RK_API_GET, { method: 'GET', headers: { 'Accept': 'application/json' } });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const data = await res.json();
+      if (data && typeof data === 'object') window.KANBAN_RACK = data;
+    } catch (e) {
+      console.warn('[TableroRack] Servidor no disponible, usando datos locales:', e.message);
+    }
+    render();
+  }
+
+  function onModeloChange(id) {
+    currentModeloId = parseInt(id);
+    render();
+  }
+
+  async function surtir(modeloId, posicion) {
+    const modelo = window.KANBAN_RACK.modelos.find(m => m.modeloId === modeloId);
+    const pos = modelo?.posiciones.find(p => p.posicion === posicion);
+    if (pos) { pos.estado = 'LIBRE'; pos.tarjeta = null; }
+    render();
+    try {
+      await fetch(RK_API_POST, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ accion: 'surtir', modeloId, posicion, timestamp: new Date().toISOString() })
+      });
+    } catch (e) {
+      console.warn('[TableroRack.surtir]', e.message);
+    }
+  }
+
+  function render() {
+    const data = window.KANBAN_RACK;
+    const sel = document.getElementById('rk-modelo-select');
+    const prevValue = sel.value;
+    sel.innerHTML = (data.modelos ?? []).map(m => `<option value="${m.modeloId}">${m.noParte}</option>`).join('');
+    if ((data.modelos ?? []).some(m => m.modeloId === currentModeloId)) {
+      sel.value = String(currentModeloId);
+    } else if (data.modelos?.length) {
+      currentModeloId = data.modelos[0].modeloId;
+      sel.value = String(currentModeloId);
+    }
+
+    const modelo = (data.modelos ?? []).find(m => m.modeloId === currentModeloId);
+    if (!modelo) return;
+
+    const ocupadas = modelo.posiciones.filter(p => p.estado === 'ESPERANDO').length;
+    const total = modelo.posiciones.length;
+
+    document.getElementById('rk-summary').innerHTML = `
+      <p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">${data.linea ?? ''}</p>
+      <h2 class="text-2xl font-black text-[#0B3A5B] mb-3">${modelo.noParte}</h2>
+      <div class="bg-slate-50 p-3 rounded-xl border border-slate-100">
+        <p class="text-[10px] font-bold text-slate-400 uppercase mb-0.5">Cajas esperando surtir</p>
+        <p class="text-2xl font-black text-[#0B3A5B]">${ocupadas}<span class="text-slate-300 text-lg">/${total}</span></p>
+      </div>`;
+
+    document.getElementById('rk-posiciones').innerHTML = [...modelo.posiciones].reverse().map(p => {
+      const isOccupied = p.estado === 'ESPERANDO';
+      return `
+        <div class="card-item flex items-center border rounded-lg px-4 py-2 ${isOccupied ? 'shadow-sm border-slate-200' : 'border-dashed border-slate-100 bg-slate-50/30 opacity-40'}"
+             style="${isOccupied ? 'border-left:8px solid var(--nc-accent);' : ''}">
+          <div class="w-10 h-10 rounded-lg flex items-center justify-center font-black text-sm shrink-0 ${isOccupied ? '' : 'text-slate-200'}"
+               style="${isOccupied ? 'color:var(--nc-primary);background:#339FC615;' : ''}">
+            ${p.posicion}/${modelo.posiciones.length}
+          </div>
+          <div class="ml-5 flex-grow">
+            ${isOccupied ? `
+              <div class="flex items-baseline gap-2">
+                <span class="text-[8px] font-bold text-slate-400 uppercase">Sebango</span>
+                <p class="font-mono text-xs font-bold text-[#0B3A5B]">${p.tarjeta.sebango}</p>
+              </div>
+              <div class="flex items-baseline gap-2">
+                <span class="text-[8px] font-bold text-slate-400 uppercase">Tarjeta</span>
+                <p class="text-[10px] font-bold text-slate-500">${p.tarjeta.tarjetaNum}/${p.tarjeta.tarjetaTotal} · ${p.tarjeta.cantidad} pzs</p>
+              </div>
+            ` : `<p class="font-mono text-xs font-bold text-slate-200">POSICIÓN LIBRE</p>`}
+          </div>
+          ${isOccupied ? `
+            <button onclick="surtir(${modelo.modeloId}, ${p.posicion})"
+              class="px-3 py-1.5 rounded-lg bg-[#339FC6] hover:bg-[#034A77] text-white text-[10px] font-bold uppercase tracking-widest transition flex items-center gap-1 shrink-0">
+              <span class="material-symbols-outlined text-sm">local_shipping</span>Surtir
+            </button>` : ''}
+        </div>`;
+    }).join('');
+  }
+
+  render();
+  setInterval(cargarDesdeServidor, 5000);
+</script>
+
+</body>
+</html>

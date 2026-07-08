@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>NC Tech MES - Leveling Board · Recolección</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans:wght@400;500;600;700;900&display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<style>
+  *, *::before, *::after { box-sizing: border-box; }
+  html, body { height: 100%; margin: 0; font-family: 'Noto Sans', sans-serif; background: #F0F4F8; color: #0B3A5B; }
+  :root {
+    --nc-dark: #0B3A5B; --nc-primary: #034A77; --nc-accent: #339FC6; --nc-light: #BFEDF6;
+    --status-ok: #10b981; --status-warning: #f59e0b; --status-critical: #ef4444;
+  }
+  .nav-link.active { background-color: rgba(255,255,255,0.2); color: #BFEDF6; }
+  .alert-row-OK       { border-left: 5px solid var(--status-ok); }
+  .alert-row-ATENCION { border-left: 5px solid var(--status-warning); }
+  .alert-row-CRITICO  { border-left: 5px solid var(--status-critical); background: #fef2f2; }
+</style>
+</head>
+<body>
+
+<header class="flex items-center justify-between gap-3 px-4 h-12 bg-[#0B3A5B] border-b border-slate-700 shadow-sm flex-shrink-0">
+  <img alt="NC Tech Logo" src="logo_nctech.png" class="h-8 w-auto object-contain flex-shrink-0"/>
+  <div class="flex-1 min-w-0 flex items-center justify-center gap-3 overflow-hidden whitespace-nowrap">
+    <span class="truncate" style="color:#BFEDF6;font-weight:700;font-size:0.6rem;letter-spacing:0.12em;text-transform:uppercase">Recolección Mizusumashi</span>
+    <div style="width:1px;height:22px;background:rgba(255,255,255,0.25)" class="shrink-0"></div>
+    <span class="truncate" style="color:#fff;font-weight:900;font-size:0.85rem;letter-spacing:0.2em;text-transform:uppercase">Leveling Board</span>
+  </div>
+  <nav class="flex gap-1 flex-shrink-0">
+    <a href="leveling_board.html" class="nav-link active px-3 py-1.5 rounded text-xs font-bold text-white hover:bg-white/10 transition">LEVELING</a>
+    <a href="lanzador.html" class="nav-link px-3 py-1.5 rounded text-xs font-bold text-white hover:bg-white/10 transition">LANZADOR</a>
+    <a href="tablero_rack.html" class="nav-link px-3 py-1.5 rounded text-xs font-bold text-white hover:bg-white/10 transition">RACK</a>
+    <a href="batch_building_box.html" class="nav-link px-3 py-1.5 rounded text-xs font-bold text-white hover:bg-white/10 transition">BATCH BOX</a>
+  </nav>
+</header>
+
+<main class="p-3" style="height:calc(100vh - 3rem)">
+  <div class="flex flex-col gap-3 h-full">
+
+    <div class="flex justify-between items-center shrink-0 gap-3 flex-wrap">
+      <div class="flex items-center gap-3">
+        <div class="bg-red-700 text-white px-6 py-1.5 font-black text-sm tracking-widest shrink-0"
+             style="clip-path:polygon(8px 0,100% 0,calc(100% - 8px) 100%,0 100%)">
+          LEVELING BOARD
+        </div>
+        <div>
+          <p id="lb-linea" class="text-[10px] font-bold text-slate-400 uppercase tracking-wider">—</p>
+          <p id="lb-turno" class="text-xs font-bold text-[#0B3A5B]">—</p>
+        </div>
+      </div>
+      <div class="flex items-center gap-3 bg-white px-4 py-2 rounded-xl shadow-sm border border-slate-200 text-[10px] font-bold">
+        <span class="material-symbols-outlined text-base text-[#339FC6]">timer</span>
+        <span class="text-slate-400 uppercase tracking-wider">Frecuencia de recolección</span>
+        <span id="lb-frecuencia" class="text-[#0B3A5B] text-sm">— min</span>
+      </div>
+    </div>
+
+    <div class="flex gap-2 items-center bg-white px-3 py-2 rounded-xl shadow-sm border border-slate-200 text-[9px] font-bold shrink-0 flex-wrap">
+      <span class="text-slate-400 uppercase tracking-wider">Estado</span>
+      <span class="text-slate-200">|</span>
+      <div class="flex items-center gap-1.5"><span class="w-3 h-3 rounded-sm inline-block" style="background:var(--status-ok)"></span>OK · &gt; 10 min para recolección</div>
+      <span class="text-slate-200">|</span>
+      <div class="flex items-center gap-1.5"><span class="w-3 h-3 rounded-sm inline-block" style="background:var(--status-warning)"></span>ATENCIÓN · 0–10 min</div>
+      <span class="text-slate-200">|</span>
+      <div class="flex items-center gap-1.5"><span class="w-3 h-3 rounded-sm inline-block" style="background:var(--status-critical)"></span>CRÍTICO · recolección vencida</div>
+    </div>
+
+    <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-y-auto flex-grow" style="min-height:0">
+      <table class="w-full text-left">
+        <thead class="bg-slate-50 border-b border-slate-200" style="position:sticky;top:0;z-index:5">
+          <tr>
+            <th class="py-2 px-4 text-[10px] font-bold text-slate-500 uppercase tracking-wider bg-slate-50">No. Parte / Modelo</th>
+            <th class="py-2 px-4 text-[10px] font-bold text-slate-500 uppercase tracking-wider bg-slate-50">Cliente</th>
+            <th class="py-2 px-4 text-[10px] font-bold text-slate-500 uppercase tracking-wider bg-slate-50">Cant. / Lote</th>
+            <th class="py-2 px-4 text-[10px] font-bold text-slate-500 uppercase tracking-wider bg-slate-50">Última recolección</th>
+            <th class="py-2 px-4 text-[10px] font-bold text-slate-500 uppercase tracking-wider bg-slate-50">Próxima recolección</th>
+            <th class="py-2 px-4 text-[10px] font-bold text-slate-500 uppercase tracking-wider bg-slate-50">Estado</th>
+            <th class="py-2 px-4 text-[10px] font-bold text-slate-500 uppercase tracking-wider bg-slate-50">Escalación</th>
+          </tr>
+        </thead>
+        <tbody id="lb-tbody" class="divide-y divide-slate-100"></tbody>
+      </table>
+    </div>
+  </div>
+</main>
+
+<script>
+  // ── Datos de fallback (usados cuando el servidor no responde) ─────────────────
+  window.KANBAN_LEVELING_RECOLECCION = {
+    linea: "L-20 EM",
+    turno: "1er Turno",
+    frecuenciaMin: 30,
+    productos: [
+      { modeloId: 1, noParte: "A7911-205-06", cliente: "Mitsuba Monterrey", cantidadPorLote: 40,
+        ultimaRecoleccion: "09:30", proximaRecoleccion: "10:00", minutosRestantes: 22, estadoAlerta: "OK", nivelEscalacion: 0, escaladoA: null },
+      { modeloId: 2, noParte: "A3289-742-01", cliente: "Mitsuba Monterrey", cantidadPorLote: 32, ultimaRecoleccion: "09:15",
+        proximaRecoleccion: "09:45", minutosRestantes: 7, estadoAlerta: "ATENCION", nivelEscalacion: 0, escaladoA: null },
+      { modeloId: 3, noParte: "A9442-834-00", cliente: "Mitsuba Monterrey", cantidadPorLote: 28, ultimaRecoleccion: "08:50",
+        proximaRecoleccion: "09:20", minutosRestantes: -14, estadoAlerta: "CRITICO", nivelEscalacion: 1, escaladoA: "Supervisor de línea" },
+      { modeloId: 4, noParte: "A7460-314-06", cliente: "Mitsuba Monterrey", cantidadPorLote: 24, ultimaRecoleccion: "08:10",
+        proximaRecoleccion: "08:40", minutosRestantes: -38, estadoAlerta: "CRITICO", nivelEscalacion: 2, escaladoA: "Gerente de producción" }
+    ]
+  };
+
+  const LB_API_GET = '/kanban/leveling-recoleccion/get';
+
+  async function cargarDesdeServidor() {
+    try {
+      const res = await fetch(LB_API_GET, { method: 'GET', headers: { 'Accept': 'application/json' } });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const data = await res.json();
+      if (data && typeof data === 'object') window.KANBAN_LEVELING_RECOLECCION = data;
+    } catch (e) {
+      console.warn('[LevelingBoard] Servidor no disponible, usando datos locales:', e.message);
+    }
+    render();
+  }
+
+  function badge(estado) {
+    const map = {
+      OK:       { cls: 'bg-green-100 text-green-700',  txt: 'OK' },
+      ATENCION: { cls: 'bg-amber-100 text-amber-700',  txt: 'ATENCIÓN' },
+      CRITICO:  { cls: 'bg-red-100 text-red-700',      txt: 'CRÍTICO' }
+    };
+    const m = map[estado] ?? map.OK;
+    return `<span class="px-3 py-1 rounded-full text-[10px] font-black uppercase ${m.cls}">${m.txt}</span>`;
+  }
+
+  function escalacion(p) {
+    if (!p.nivelEscalacion) return '<span class="text-slate-300 text-xs">—</span>';
+    const color = p.nivelEscalacion >= 2 ? 'text-red-600' : 'text-amber-600';
+    return `<span class="text-xs font-bold ${color}">Nivel ${p.nivelEscalacion} · ${p.escaladoA ?? ''}</span>`;
+  }
+
+  function render() {
+    const data = window.KANBAN_LEVELING_RECOLECCION;
+    document.getElementById('lb-linea').textContent = data.linea ?? '—';
+    document.getElementById('lb-turno').textContent = data.turno ?? '—';
+    document.getElementById('lb-frecuencia').textContent = `${data.frecuenciaMin ?? '—'} min`;
+
+    document.getElementById('lb-tbody').innerHTML = (data.productos ?? []).map(p => `
+      <tr class="alert-row-${p.estadoAlerta} hover:bg-blue-50/30 transition-colors">
+        <td class="py-3 px-4">
+          <div class="font-bold text-sm text-[#0B3A5B]">${p.noParte}</div>
+        </td>
+        <td class="py-3 px-4 text-xs font-semibold text-slate-500">${p.cliente}</td>
+        <td class="py-3 px-4 font-mono text-sm font-bold text-[#0B3A5B]">${p.cantidadPorLote}</td>
+        <td class="py-3 px-4 font-mono text-xs text-slate-500">${p.ultimaRecoleccion}</td>
+        <td class="py-3 px-4">
+          <div class="font-mono text-xs font-bold text-[#0B3A5B]">${p.proximaRecoleccion}</div>
+          <div class="text-[10px] font-bold ${p.minutosRestantes < 0 ? 'text-red-500' : 'text-slate-400'}">
+            ${p.minutosRestantes < 0 ? `vencida hace ${Math.abs(p.minutosRestantes)} min` : `en ${p.minutosRestantes} min`}
+          </div>
+        </td>
+        <td class="py-3 px-4">${badge(p.estadoAlerta)}</td>
+        <td class="py-3 px-4">${escalacion(p)}</td>
+      </tr>
+    `).join('');
+  }
+
+  render();
+  setInterval(cargarDesdeServidor, 5000);
+</script>
+
+</body>
+</html>

@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>NC Tech MES - Lanzador · Recolección</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans:wght@400;500;600;700;900&display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<style>
+  *, *::before, *::after { box-sizing: border-box; }
+  html, body { height: 100%; margin: 0; font-family: 'Noto Sans', sans-serif; background: #F0F4F8; color: #0B3A5B; }
+  :root {
+    --nc-dark: #0B3A5B; --nc-primary: #034A77; --nc-accent: #339FC6; --nc-light: #BFEDF6;
+    --status-ok: #10b981; --status-warning: #f59e0b; --status-critical: #ef4444;
+  }
+  .nav-link.active { background-color: rgba(255,255,255,0.2); color: #BFEDF6; }
+  .pik-card { border-radius: 0.6rem; box-shadow: 0 1px 3px rgba(0,0,0,.12); transition: transform .15s ease; }
+  .pik-card.front { transform: translateY(-2px); box-shadow: 0 4px 10px rgba(3,74,119,.25); }
+  .pik-card.marker-produccion  { background: var(--status-ok); color: #fff; }
+  .pik-card.marker-cambio      { background: #e2e8f0; color: #1e293b; border: 2px dashed #94a3b8; }
+  .slot-col { min-width: 200px; }
+</style>
+</head>
+<body>
+
+<header class="flex items-center justify-between gap-3 px-4 h-12 bg-[#0B3A5B] border-b border-slate-700 shadow-sm flex-shrink-0">
+  <img alt="NC Tech Logo" src="logo_nctech.png" class="h-8 w-auto object-contain flex-shrink-0"/>
+  <div class="flex-1 min-w-0 flex items-center justify-center gap-3 overflow-hidden whitespace-nowrap">
+    <span class="truncate" style="color:#BFEDF6;font-weight:700;font-size:0.6rem;letter-spacing:0.12em;text-transform:uppercase">Recolección Mizusumashi</span>
+    <div style="width:1px;height:22px;background:rgba(255,255,255,0.25)" class="shrink-0"></div>
+    <span class="truncate" style="color:#fff;font-weight:900;font-size:0.85rem;letter-spacing:0.2em;text-transform:uppercase">Lanzador</span>
+  </div>
+  <nav class="flex gap-1 flex-shrink-0">
+    <a href="leveling_board.html" class="nav-link px-3 py-1.5 rounded text-xs font-bold text-white hover:bg-white/10 transition">LEVELING</a>
+    <a href="lanzador.html" class="nav-link active px-3 py-1.5 rounded text-xs font-bold text-white hover:bg-white/10 transition">LANZADOR</a>
+    <a href="tablero_rack.html" class="nav-link px-3 py-1.5 rounded text-xs font-bold text-white hover:bg-white/10 transition">RACK</a>
+    <a href="batch_building_box.html" class="nav-link px-3 py-1.5 rounded text-xs font-bold text-white hover:bg-white/10 transition">BATCH BOX</a>
+  </nav>
+</header>
+
+<main class="p-3" style="height:calc(100vh - 3rem)">
+  <div class="flex flex-col gap-3 h-full">
+
+    <div class="flex justify-between items-center shrink-0 gap-3 flex-wrap">
+      <div class="flex items-center gap-3">
+        <div class="bg-red-700 text-white px-6 py-1.5 font-black text-sm tracking-widest shrink-0"
+             style="clip-path:polygon(8px 0,100% 0,calc(100% - 8px) 100%,0 100%)">
+          LANZADOR
+        </div>
+        <div>
+          <p id="lz-linea" class="text-[10px] font-bold text-slate-400 uppercase tracking-wider">—</p>
+          <p id="lz-turno" class="text-xs font-bold text-[#0B3A5B]">—</p>
+        </div>
+      </div>
+      <div class="flex gap-2 items-center bg-white px-3 py-2 rounded-xl shadow-sm border border-slate-200 text-[9px] font-bold">
+        <span class="text-slate-400 uppercase tracking-wider">Leyenda</span>
+        <span class="text-slate-200">|</span>
+        <div class="flex items-center gap-1.5"><span class="w-3 h-3 rounded-sm inline-block" style="background:var(--status-ok)"></span>PRODUCCIÓN (frente de cola)</div>
+        <span class="text-slate-200">|</span>
+        <div class="flex items-center gap-1.5"><span class="w-3 h-3 rounded-sm inline-block border-2 border-dashed border-slate-400 bg-slate-200"></span>CAMBIO DE MODELO</div>
+      </div>
+    </div>
+
+    <div id="lz-slots" class="flex gap-3 overflow-x-auto flex-grow bg-white rounded-xl border border-slate-200 shadow-sm p-3" style="min-height:0"></div>
+  </div>
+</main>
+
+<script>
+  // ── Datos de fallback (usados cuando el servidor no responde) ─────────────────
+  window.KANBAN_LANZADOR = {
+    linea: "L-20 EM",
+    turno: "1er Turno",
+    slots: [
+      { prioridad: 1, cola: [
+        { tarjetaId: "A7911-205-06-01", noParte: "A7911-205-06", sebango: "R3MF1-01", cliente: "Mitsuba Monterrey", clienteInterno: "TPA Mitsuba", cantidad: 40, tarjetaNum: 1, tarjetaTotal: 14, tipo: "produccion" },
+        { tarjetaId: "A7911-205-06-02", noParte: "A7911-205-06", sebango: "R3MF1-01", cliente: "Mitsuba Monterrey", clienteInterno: "TPA Mitsuba", cantidad: 40, tarjetaNum: 2, tarjetaTotal: 14, tipo: "normal" },
+        { tarjetaId: "A7911-205-06-03", noParte: "A7911-205-06", sebango: "R3MF1-01", cliente: "Mitsuba Monterrey", clienteInterno: "TPA Mitsuba", cantidad: 40, tarjetaNum: 3, tarjetaTotal: 14, tipo: "normal" },
+        { tarjetaId: "cambio-1", tipo: "cambio_modelo" },
+        { tarjetaId: "A3289-742-01-01", noParte: "A3289-742-01", sebango: "R3MF1-02", cliente: "Mitsuba Monterrey", clienteInterno: "TPA Mitsuba", cantidad: 32, tarjetaNum: 1, tarjetaTotal: 10, tipo: "normal" }
+      ]},
+      { prioridad: 2, cola: [
+        { tarjetaId: "A9442-834-00-01", noParte: "A9442-834-00", sebango: "R3MF1-03", cliente: "Mitsuba Monterrey", clienteInterno: "TPA Mitsuba", cantidad: 28, tarjetaNum: 1, tarjetaTotal: 8, tipo: "produccion" },
+        { tarjetaId: "A9442-834-00-02", noParte: "A9442-834-00", sebango: "R3MF1-03", cliente: "Mitsuba Monterrey", clienteInterno: "TPA Mitsuba", cantidad: 28, tarjetaNum: 2, tarjetaTotal: 8, tipo: "normal" }
+      ]},
+      { prioridad: 3, cola: [
+        { tarjetaId: "A7460-314-06-01", noParte: "A7460-314-06", sebango: "R3MF1-04", cliente: "Mitsuba Monterrey", clienteInterno: "TPA Mitsuba", cantidad: 24, tarjetaNum: 1, tarjetaTotal: 6, tipo: "produccion" }
+      ]}
+    ]
+  };
+
+  const LZ_API_GET  = '/kanban/lanzador/get';
+  const LZ_API_POST = '/kanban/lanzador/post';
+
+  async function cargarDesdeServidor() {
+    try {
+      const res = await fetch(LZ_API_GET, { method: 'GET', headers: { 'Accept': 'application/json' } });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const data = await res.json();
+      if (data && typeof data === 'object') window.KANBAN_LANZADOR = data;
+    } catch (e) {
+      console.warn('[Lanzador] Servidor no disponible, usando datos locales:', e.message);
+    }
+    render();
+  }
+
+  async function descartarTarjeta(prioridad, tarjetaId) {
+    const slot = window.KANBAN_LANZADOR.slots.find(s => s.prioridad === prioridad);
+    if (slot) slot.cola = slot.cola.filter(t => t.tarjetaId !== tarjetaId);
+    render();
+    try {
+      await fetch(LZ_API_POST, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ accion: 'descartar_tarjeta', prioridad, tarjetaId, timestamp: new Date().toISOString() })
+      });
+    } catch (e) {
+      console.warn('[Lanzador.descartarTarjeta]', e.message);
+    }
+  }
+
+  function tarjetaHtml(t, prioridad, isFront) {
+    if (t.tipo === 'cambio_modelo') {
+      return `
+        <div class="pik-card marker-cambio px-3 py-3 text-center">
+          <span class="material-symbols-outlined text-base align-middle">sync_alt</span>
+          <p class="text-[10px] font-black uppercase tracking-wider mt-1">Cambio de Modelo</p>
+        </div>`;
+    }
+    return `
+      <div class="pik-card ${isFront ? 'front' : ''} px-3 py-2.5 bg-white border ${isFront ? 'border-[#339FC6]' : 'border-slate-200'}">
+        ${isFront ? `<div class="text-[9px] font-black uppercase tracking-wider mb-1" style="color:var(--status-ok)">● En producción</div>` : ''}
+        <p class="font-mono text-xs font-bold text-[#0B3A5B]">${t.noParte}</p>
+        <p class="text-[9px] font-semibold text-slate-400">Sebango: ${t.sebango}</p>
+        <p class="text-[9px] font-semibold text-slate-400">${t.clienteInterno}</p>
+        <div class="flex justify-between items-center mt-1.5 pt-1.5 border-t border-slate-100">
+          <span class="text-[9px] font-bold text-slate-400">Tarjeta ${t.tarjetaNum}/${t.tarjetaTotal}</span>
+          <span class="text-xs font-black text-[#0B3A5B]">${t.cantidad} pzs</span>
+        </div>
+        ${isFront ? `
+          <button onclick="descartarTarjeta(${prioridad}, '${t.tarjetaId}')"
+            class="mt-2 w-full py-1.5 rounded-lg bg-[#0B3A5B] hover:bg-[#034A77] text-white text-[10px] font-bold uppercase tracking-wider transition flex items-center justify-center gap-1">
+            <span class="material-symbols-outlined text-sm">check</span>Descartar
+          </button>` : ''}
+      </div>`;
+  }
+
+  function render() {
+    const data = window.KANBAN_LANZADOR;
+    document.getElementById('lz-linea').textContent = data.linea ?? '—';
+    document.getElementById('lz-turno').textContent = data.turno ?? '—';
+
+    document.getElementById('lz-slots').innerHTML = (data.slots ?? []).map(slot => `
+      <div class="slot-col flex flex-col gap-2 shrink-0">
+        <div class="bg-[#0B3A5B] text-white text-center py-1.5 rounded-lg font-black text-xs uppercase tracking-widest">
+          Prioridad ${slot.prioridad}
+        </div>
+        <div class="flex flex-col gap-2 overflow-y-auto">
+          ${slot.cola.length === 0
+            ? `<p class="text-center text-[10px] font-bold text-slate-300 uppercase py-6">Cola vacía</p>`
+            : slot.cola.map((t, i) => tarjetaHtml(t, slot.prioridad, i === 0)).join('')}
+        </div>
+      </div>
+    `).join('');
+  }
+
+  render();
+  setInterval(cargarDesdeServidor, 5000);
+</script>
+
+</body>
+</html>
