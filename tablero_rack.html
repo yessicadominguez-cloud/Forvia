@@ -7,6 +7,7 @@
 <link href="https://fonts.googleapis.com/css2?family=Noto+Sans:wght@400;500;600;700;900&display=swap" rel="stylesheet"/>
 <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
 <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script src="mock_backend.js"></script>
 <style>
   *, *::before, *::after { box-sizing: border-box; }
   html, body { height: 100%; margin: 0; font-family: 'Noto Sans', sans-serif; background: #F0F4F8; color: #0B3A5B; }
@@ -95,6 +96,34 @@
   const RK_API_GET  = '/kanban/rack/get';
   const RK_API_POST = '/kanban/rack/post';
 
+  function horaAhora() {
+    const d = new Date();
+    return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+  }
+
+  // Recoge las cajas que el Lanzador fue "descartando" (ver mock_backend.js) y las
+  // coloca como nuevas posiciones ESPERANDO — así una acción en Lanzador se refleja aquí.
+  function recibirCajasDeLanzador() {
+    (window.KANBAN_RACK.modelos ?? []).forEach(modelo => {
+      const cajas = MockBackend.tomarCajasRack(modelo.noParte);
+      cajas.forEach(caja => {
+        const libre = modelo.posiciones.find(p => p.estado === 'LIBRE');
+        const nuevaTarjeta = {
+          sebango: caja.sebango, cantidad: caja.cantidad, tarjetaNum: caja.tarjetaNum, tarjetaTotal: caja.tarjetaTotal,
+          idCaja: idCajaSeed(modelo.modeloId, caja.tarjetaNum), numSerie: numSerieSeed(modelo.modeloId, caja.tarjetaNum),
+          hora: horaAhora(), lote: 1
+        };
+        if (libre) {
+          libre.estado = 'ESPERANDO';
+          libre.tarjeta = nuevaTarjeta;
+        } else {
+          const siguiente = (modelo.posiciones[modelo.posiciones.length - 1]?.posicion ?? 0) + 1;
+          modelo.posiciones.push({ posicion: siguiente, estado: 'ESPERANDO', tarjeta: nuevaTarjeta });
+        }
+      });
+    });
+  }
+
   async function cargarDesdeServidor() {
     try {
       const res = await fetch(RK_API_GET, { method: 'GET', headers: { 'Accept': 'application/json' } });
@@ -104,6 +133,7 @@
     } catch (e) {
       console.warn('[TableroRack] Servidor no disponible, usando datos locales:', e.message);
     }
+    recibirCajasDeLanzador();
     render();
   }
 
@@ -183,6 +213,7 @@
     }).join('');
   }
 
+  recibirCajasDeLanzador();
   render();
   setInterval(cargarDesdeServidor, 5000);
 </script>

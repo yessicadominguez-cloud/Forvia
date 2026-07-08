@@ -7,6 +7,7 @@
 <link href="https://fonts.googleapis.com/css2?family=Noto+Sans:wght@400;500;600;700;900&display=swap" rel="stylesheet"/>
 <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
 <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script src="mock_backend.js"></script>
 <style>
   *, *::before, *::after { box-sizing: border-box; }
   html, body { height: 100%; margin: 0; font-family: 'Noto Sans', sans-serif; background: #F0F4F8; color: #0B3A5B; }
@@ -99,7 +100,15 @@
 
   async function descartarTarjeta(prioridad, tarjetaId) {
     const slot = window.KANBAN_LANZADOR.slots.find(s => s.prioridad === prioridad);
+    const tarjeta = slot?.cola.find(t => t.tarjetaId === tarjetaId);
     if (slot) slot.cola = slot.cola.filter(t => t.tarjetaId !== tarjetaId);
+    if (tarjeta) {
+      // La tarjeta pasa del Lanzador a una caja nueva esperando en el Tablero de Rack.
+      MockBackend.agregarCajaRack(tarjeta.noParte, {
+        sebango: tarjeta.sebango, cantidad: tarjeta.cantidad,
+        tarjetaNum: tarjeta.tarjetaNum, tarjetaTotal: tarjeta.tarjetaTotal
+      });
+    }
     render();
     try {
       await fetch(LZ_API_POST, {
@@ -111,7 +120,7 @@
     }
   }
 
-  function tarjetaHtml(t, prioridad, isFront) {
+  function tarjetaHtml(t, prioridad, isFront, ordenLabel) {
     if (t.tipo === 'cambio_modelo') {
       return `
         <div class="pik-card marker-cambio px-3 py-3 text-center">
@@ -121,7 +130,9 @@
     }
     return `
       <div class="pik-card ${isFront ? 'front' : ''} px-3 py-2.5">
-        ${isFront ? `<div class="text-[9px] font-black uppercase tracking-wider mb-1" style="color:var(--status-ok)">● En producción</div>` : ''}
+        ${isFront
+          ? `<div class="text-[9px] font-black uppercase tracking-wider mb-1" style="color:var(--status-ok)">● En producción</div>`
+          : `<div class="text-[9px] font-black uppercase tracking-wider mb-1 text-slate-400">${ordenLabel}</div>`}
         <p class="font-mono text-xs font-bold text-[#0B3A5B]">${t.noParte}</p>
         <p class="text-[9px] font-semibold text-slate-400">Sebango: ${t.sebango}</p>
         <p class="text-[9px] font-semibold text-slate-400">${t.clienteInterno}</p>
@@ -167,7 +178,16 @@
         </div>
         <div class="flex flex-col gap-2 overflow-y-auto">
           ${aviso}
-          ${slot.cola.length === 0 && restantes === 0 ? '' : slot.cola.map((t, i) => tarjetaHtml(t, slot.prioridad, i === 0)).join('')}
+          ${(() => {
+            let posReal = 0;
+            return slot.cola.map(t => {
+              if (t.tipo === 'cambio_modelo') return tarjetaHtml(t, slot.prioridad, false, '');
+              posReal++;
+              const isFront = posReal === 1;
+              const ordenLabel = posReal === 2 ? 'Siguiente' : (posReal > 2 ? `En espera · turno ${posReal}` : '');
+              return tarjetaHtml(t, slot.prioridad, isFront, ordenLabel);
+            }).join('');
+          })()}
         </div>
       </div>`;
     }).join('');

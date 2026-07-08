@@ -9,6 +9,19 @@ del diagrama de flujo `Flujo de Aplicación E-Kanban.drawio.pdf`.
   Cada uno es standalone (no comparten nav); cada uno hace su propio polling con fallback a datos mock.
 - Estas rutas son **nuevas**, no colisionan con las de `INTEGRACION_DEVICEWISE.md` (Honda 25SA / Surtidor).
 
+### `mock_backend.js` — simulación de conexión entre pantallas (solo para el mockup)
+
+Mientras no hay servidor real, `mock_backend.js` usa `localStorage` para que una acción en una
+pantalla se refleje en otra dentro del mismo navegador, imitando el flujo real:
+
+- **Lanzador → Rack:** al descartar una tarjeta, se encola una caja nueva que Rack recoge en su
+  siguiente polling y muestra como posición `ESPERANDO`.
+- **Batch Building Box → Leveling Board:** al retirar una tarjeta (`retirarTarjeta`), se suma 1 a la
+  producción del modelo; Leveling Board lo refleja sumándolo al `POOL` de la franja actual.
+
+Esto **no reemplaza** el contrato de endpoints de abajo — cuando exista servidor real, cada
+`GET .../get` trae el estado ya consolidado y `mock_backend.js` deja de ser necesario.
+
 ## Conceptos (del PDF)
 
 | Concepto | Significado |
