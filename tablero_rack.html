@@ -15,8 +15,10 @@
     --status-ok: #10b981; --status-warning: #f59e0b; --status-critical: #ef4444;
   }
   .nav-link.active { background-color: rgba(255,255,255,0.2); color: #BFEDF6; }
-  .cards-grid-container { display: flex; flex-direction: column; gap: 0.4rem; }
-  .card-item { flex: 1; min-height: 0; }
+  .rack-col { flex: 1 1 0; min-width: 215px; }
+  .rack-slot { border-radius: 0.6rem; }
+  .rack-slot.ocupada { background: #fff; border: 1px solid var(--nc-accent); box-shadow: 0 1px 2px rgba(0,0,0,.08); }
+  .rack-slot.libre   { border: 1px dashed #cbd5e1; background: transparent; opacity: .5; }
 </style>
 </head>
 <body>
@@ -37,47 +39,33 @@
 </header>
 
 <main class="p-3" style="height:calc(100vh - 3rem)">
-  <div class="grid grid-cols-12 gap-3 h-full overflow-hidden">
+  <div class="flex flex-col gap-3 h-full">
 
-    <div class="col-span-3 flex flex-col gap-3 overflow-hidden">
-      <div class="bg-white rounded-xl border border-slate-200 shadow-sm px-4 py-3 shrink-0">
-        <label class="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-1.5">Modelo</label>
-        <div class="relative">
-          <select id="rk-modelo-select" onchange="onModeloChange(this.value)"
-            class="w-full border border-slate-300 rounded-lg pl-3 pr-8 py-2 text-sm font-semibold text-[#0B3A5B] focus:border-[#339FC6] focus:ring-2 focus:ring-[#339FC6]/20 outline-none transition-all appearance-none bg-white">
-          </select>
-          <div class="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-slate-400">
-            <span class="material-symbols-outlined text-[18px]">expand_more</span>
-          </div>
-        </div>
-      </div>
-
-      <div id="rk-summary" class="bg-white rounded-xl border border-slate-200 shadow-sm p-5 shrink-0"></div>
-
-      <div class="bg-[#0B3A5B] text-white p-4 rounded-xl shadow-sm shrink-0">
-        <h3 class="text-[10px] font-bold uppercase tracking-widest opacity-60 mb-3">Leyenda</h3>
-        <div class="space-y-2 text-[10px]">
-          <div class="flex items-center justify-between border-b border-white/10 pb-2">
-            <div class="flex items-center gap-2"><div class="w-3 h-3 rounded-full" style="background:var(--status-accent, #339FC6)"></div><span>ESPERANDO SURTIR</span></div>
-          </div>
-          <div class="flex items-center justify-between">
-            <div class="flex items-center gap-2"><div class="w-3 h-3 rounded-full border border-white/30"></div><span>LIBRE</span></div>
-          </div>
-        </div>
-      </div>
+    <div class="shrink-0 pb-2 border-b-2" style="border-color:var(--nc-accent)">
+      <h1 class="text-xl font-black tracking-tight" style="color:var(--nc-dark)">Tablero de Rack</h1>
+      <p class="text-[11px] text-slate-400 mt-0.5">
+        <span id="rk-linea">—</span> · cajas esperando ser surtidas, por modelo &nbsp;·&nbsp;
+        <span class="px-1 rounded border" style="border-color:var(--nc-accent)">llena</span> esperando &nbsp;·&nbsp;
+        <span class="px-1 rounded border border-dashed border-slate-300">punteada</span> libre
+      </p>
     </div>
 
-    <div class="col-span-9 bg-white rounded-xl border border-slate-200 shadow-sm p-4 h-full overflow-hidden flex flex-col">
-      <div class="flex justify-between items-center mb-2 px-1 shrink-0">
-        <h3 class="text-xs font-bold text-slate-400 uppercase tracking-wider">Cajas en Rack — Secuencia LIFO</h3>
-        <span class="text-[10px] text-[#339FC6] font-bold">Esperando surtir</span>
-      </div>
-      <div id="rk-posiciones" class="cards-grid-container flex-grow overflow-y-auto"></div>
-    </div>
+    <div id="rk-cols" class="flex gap-3 overflow-x-auto flex-grow" style="min-height:0"></div>
   </div>
 </main>
 
 <script>
+  function horaSeed(p) {
+    const total = 7 * 60 + p * 8;
+    return `${String(Math.floor(total / 60)).padStart(2, '0')}:${String(total % 60).padStart(2, '0')}`;
+  }
+  function idCajaSeed(modeloId, p) {
+    return `CJ-${String(modeloId * 1000 + p).padStart(6, '0')}`;
+  }
+  function numSerieSeed(modeloId, p) {
+    return String(1000000000 + modeloId * 1000000 + p * 137).padStart(11, '0');
+  }
+
   // ── Datos de fallback (usados cuando el servidor no responde) ─────────────────
   window.KANBAN_RACK = {
     linea: "L-20 EM",
@@ -85,22 +73,27 @@
       { modeloId: 1, noParte: "A7911-205-06", posiciones: Array.from({length: 8}, (_, i) => {
           const p = i + 1;
           return p <= 3
-            ? { posicion: p, estado: 'ESPERANDO', tarjeta: { tarjetaId: `A7911-205-06-0${p}`, sebango: 'R3MF1-01', cantidad: 40, tarjetaNum: p, tarjetaTotal: 14 } }
+            ? { posicion: p, estado: 'ESPERANDO', tarjeta: { tarjetaId: `A7911-205-06-0${p}`, sebango: 'R3MF1-01', cantidad: 40, tarjetaNum: p, tarjetaTotal: 14, idCaja: idCajaSeed(1, p), numSerie: numSerieSeed(1, p), hora: horaSeed(p), lote: 1 } }
             : { posicion: p, estado: 'LIBRE', tarjeta: null };
         }) },
       { modeloId: 2, noParte: "A3289-742-01", posiciones: Array.from({length: 6}, (_, i) => {
           const p = i + 1;
           return p <= 5
-            ? { posicion: p, estado: 'ESPERANDO', tarjeta: { tarjetaId: `A3289-742-01-0${p}`, sebango: 'R3MF1-02', cantidad: 32, tarjetaNum: p, tarjetaTotal: 10 } }
+            ? { posicion: p, estado: 'ESPERANDO', tarjeta: { tarjetaId: `A3289-742-01-0${p}`, sebango: 'R3MF1-02', cantidad: 32, tarjetaNum: p, tarjetaTotal: 10, idCaja: idCajaSeed(2, p), numSerie: numSerieSeed(2, p), hora: horaSeed(p), lote: 1 } }
             : { posicion: p, estado: 'LIBRE', tarjeta: null };
         }) },
-      { modeloId: 3, noParte: "A9442-834-00", posiciones: Array.from({length: 6}, (_, i) => ({ posicion: i + 1, estado: 'LIBRE', tarjeta: null })) }
+      { modeloId: 3, noParte: "A9442-834-00", posiciones: Array.from({length: 6}, (_, i) => ({ posicion: i + 1, estado: 'LIBRE', tarjeta: null })) },
+      { modeloId: 4, noParte: "A7460-314-06", posiciones: Array.from({length: 4}, (_, i) => {
+          const p = i + 1;
+          return p === 1
+            ? { posicion: p, estado: 'ESPERANDO', tarjeta: { tarjetaId: `A7460-314-06-0${p}`, sebango: 'R3MF1-04', cantidad: 24, tarjetaNum: p, tarjetaTotal: 6, idCaja: idCajaSeed(4, p), numSerie: numSerieSeed(4, p), hora: horaSeed(p), lote: 1 } }
+            : { posicion: p, estado: 'LIBRE', tarjeta: null };
+        }) }
     ]
   };
 
   const RK_API_GET  = '/kanban/rack/get';
   const RK_API_POST = '/kanban/rack/post';
-  let currentModeloId = 1;
 
   async function cargarDesdeServidor() {
     try {
@@ -111,11 +104,6 @@
     } catch (e) {
       console.warn('[TableroRack] Servidor no disponible, usando datos locales:', e.message);
     }
-    render();
-  }
-
-  function onModeloChange(id) {
-    currentModeloId = parseInt(id);
     render();
   }
 
@@ -134,58 +122,53 @@
     }
   }
 
+  function slotHtml(modelo, pos) {
+    if (pos.estado !== 'ESPERANDO') {
+      return `
+        <div class="rack-slot libre px-2 py-2 flex items-center justify-center text-[9px] font-bold text-slate-300 uppercase">
+          Libre
+        </div>`;
+    }
+    return `
+      <div class="rack-slot ocupada px-2 py-2">
+        <div class="flex justify-between items-center font-mono">
+          <span class="text-[10px] font-black" style="color:var(--nc-primary)">${pos.tarjeta.sebango}</span>
+          <span class="text-[9px] font-bold text-slate-400">${pos.tarjeta.tarjetaNum}/${pos.tarjeta.tarjetaTotal}</span>
+        </div>
+        <div class="flex justify-between items-center mt-1.5 font-mono">
+          <span class="font-black text-[15px]" title="ID Caja">${pos.tarjeta.idCaja}</span>
+          <span class="font-black text-[13px] opacity-90" title="Nº Serie">${pos.tarjeta.numSerie}</span>
+        </div>
+        <div class="flex justify-between items-center mt-1.5 text-[11px] font-bold opacity-80">
+          <span class="flex items-center gap-0.5"><span class="material-symbols-outlined" style="font-size:12px">schedule</span>${pos.tarjeta.hora}</span>
+          <span>Lote ${pos.tarjeta.lote}</span>
+        </div>
+        <div class="flex justify-between items-center mt-1.5">
+          <span class="text-[10px] font-black" style="color:var(--nc-dark)">${pos.tarjeta.cantidad} pzs</span>
+          <button onclick="surtir(${modelo.modeloId}, ${pos.posicion})"
+            class="px-2 py-1 rounded text-white text-[9px] font-bold uppercase tracking-wide transition flex items-center gap-1"
+            style="background:var(--nc-accent)" onmouseover="this.style.background='var(--nc-primary)'" onmouseout="this.style.background='var(--nc-accent)'">
+            <span class="material-symbols-outlined text-xs">local_shipping</span>Surtir
+          </button>
+        </div>
+      </div>`;
+  }
+
   function render() {
     const data = window.KANBAN_RACK;
-    const sel = document.getElementById('rk-modelo-select');
-    const prevValue = sel.value;
-    sel.innerHTML = (data.modelos ?? []).map(m => `<option value="${m.modeloId}">${m.noParte}</option>`).join('');
-    if ((data.modelos ?? []).some(m => m.modeloId === currentModeloId)) {
-      sel.value = String(currentModeloId);
-    } else if (data.modelos?.length) {
-      currentModeloId = data.modelos[0].modeloId;
-      sel.value = String(currentModeloId);
-    }
+    document.getElementById('rk-linea').textContent = data.linea ?? '—';
 
-    const modelo = (data.modelos ?? []).find(m => m.modeloId === currentModeloId);
-    if (!modelo) return;
-
-    const ocupadas = modelo.posiciones.filter(p => p.estado === 'ESPERANDO').length;
-    const total = modelo.posiciones.length;
-
-    document.getElementById('rk-summary').innerHTML = `
-      <p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">${data.linea ?? ''}</p>
-      <h2 class="text-2xl font-black text-[#0B3A5B] mb-3">${modelo.noParte}</h2>
-      <div class="bg-slate-50 p-3 rounded-xl border border-slate-100">
-        <p class="text-[10px] font-bold text-slate-400 uppercase mb-0.5">Cajas esperando surtir</p>
-        <p class="text-2xl font-black text-[#0B3A5B]">${ocupadas}<span class="text-slate-300 text-lg">/${total}</span></p>
-      </div>`;
-
-    document.getElementById('rk-posiciones').innerHTML = [...modelo.posiciones].reverse().map(p => {
-      const isOccupied = p.estado === 'ESPERANDO';
+    document.getElementById('rk-cols').innerHTML = (data.modelos ?? []).map(modelo => {
+      const ocupadas = modelo.posiciones.filter(p => p.estado === 'ESPERANDO').length;
       return `
-        <div class="card-item flex items-center border rounded-lg px-4 py-2 ${isOccupied ? 'shadow-sm border-slate-200' : 'border-dashed border-slate-100 bg-slate-50/30 opacity-40'}"
-             style="${isOccupied ? 'border-left:8px solid var(--nc-accent);' : ''}">
-          <div class="w-10 h-10 rounded-lg flex items-center justify-center font-black text-sm shrink-0 ${isOccupied ? '' : 'text-slate-200'}"
-               style="${isOccupied ? 'color:var(--nc-primary);background:#339FC615;' : ''}">
-            ${p.posicion}/${modelo.posiciones.length}
+        <div class="rack-col flex flex-col gap-2">
+          <div class="flex justify-between items-baseline">
+            <span class="font-mono font-black text-xs" style="color:var(--nc-dark)">${modelo.noParte}</span>
+            <span class="text-[9px] font-bold text-slate-400">${ocupadas}/${modelo.posiciones.length}</span>
           </div>
-          <div class="ml-5 flex-grow">
-            ${isOccupied ? `
-              <div class="flex items-baseline gap-2">
-                <span class="text-[8px] font-bold text-slate-400 uppercase">Sebango</span>
-                <p class="font-mono text-xs font-bold text-[#0B3A5B]">${p.tarjeta.sebango}</p>
-              </div>
-              <div class="flex items-baseline gap-2">
-                <span class="text-[8px] font-bold text-slate-400 uppercase">Tarjeta</span>
-                <p class="text-[10px] font-bold text-slate-500">${p.tarjeta.tarjetaNum}/${p.tarjeta.tarjetaTotal} · ${p.tarjeta.cantidad} pzs</p>
-              </div>
-            ` : `<p class="font-mono text-xs font-bold text-slate-200">POSICIÓN LIBRE</p>`}
+          <div class="flex flex-col gap-1.5 overflow-y-auto">
+            ${[...modelo.posiciones].reverse().map(p => slotHtml(modelo, p)).join('')}
           </div>
-          ${isOccupied ? `
-            <button onclick="surtir(${modelo.modeloId}, ${p.posicion})"
-              class="px-3 py-1.5 rounded-lg bg-[#339FC6] hover:bg-[#034A77] text-white text-[10px] font-bold uppercase tracking-widest transition flex items-center gap-1 shrink-0">
-              <span class="material-symbols-outlined text-sm">local_shipping</span>Surtir
-            </button>` : ''}
         </div>`;
     }).join('');
   }

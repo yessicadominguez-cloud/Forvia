@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8"/>
 <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
-<title>NC Tech MES - Leveling Board · Recolección</title>
+<title>NC Tech MES - Leveling Board</title>
 <link href="https://fonts.googleapis.com/css2?family=Noto+Sans:wght@400;500;600;700;900&display=swap" rel="stylesheet"/>
 <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
 <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
@@ -15,9 +15,14 @@
     --status-ok: #10b981; --status-warning: #f59e0b; --status-critical: #ef4444;
   }
   .nav-link.active { background-color: rgba(255,255,255,0.2); color: #BFEDF6; }
-  .alert-row-OK       { border-left: 5px solid var(--status-ok); }
-  .alert-row-ATENCION { border-left: 5px solid var(--status-warning); }
-  .alert-row-CRITICO  { border-left: 5px solid var(--status-critical); background: #fef2f2; }
+  .lv-table { border-collapse: collapse; font-size: 10px; white-space: nowrap; }
+  .lv-table th, .lv-table td { border: 1px solid #e2e8f0; padding: 3px 5px; text-align: center; }
+  .lv-table thead th { background: var(--nc-light); font-weight: 800; text-transform: uppercase; font-size: 9px; }
+  .lv-cell-match     { background: #ecfdf5; color: #065f46; }
+  .lv-cell-mismatch  { background: #fffbeb; color: #92400e; }
+  .lv-cell-current   { outline: 2px solid var(--nc-accent); outline-offset: -2px; }
+  .tpa-input { width: 34px; border: none; text-align: center; background: transparent; font-family: inherit; font-size: 10px; font-weight: 700; }
+  .tpa-input:focus { background: #fff; outline: 1px solid var(--nc-accent); }
 </style>
 </head>
 <body>
@@ -25,7 +30,7 @@
 <header class="flex items-center justify-between gap-3 px-4 h-12 bg-[#0B3A5B] border-b border-slate-700 shadow-sm flex-shrink-0">
   <img alt="NC Tech Logo" src="logo_nctech.png" class="h-8 w-auto object-contain flex-shrink-0"/>
   <div class="flex-1 min-w-0 flex items-center justify-center gap-3 overflow-hidden whitespace-nowrap">
-    <span class="truncate" style="color:#BFEDF6;font-weight:700;font-size:0.6rem;letter-spacing:0.12em;text-transform:uppercase">Recolección Mizusumashi</span>
+    <span class="truncate" style="color:#BFEDF6;font-weight:700;font-size:0.6rem;letter-spacing:0.12em;text-transform:uppercase">Planta · Todas las líneas</span>
     <div style="width:1px;height:22px;background:rgba(255,255,255,0.25)" class="shrink-0"></div>
     <span class="truncate" style="color:#fff;font-weight:900;font-size:0.85rem;letter-spacing:0.2em;text-transform:uppercase">Leveling Board</span>
   </div>
@@ -40,125 +45,164 @@
 <main class="p-3" style="height:calc(100vh - 3rem)">
   <div class="flex flex-col gap-3 h-full">
 
-    <div class="flex justify-between items-center shrink-0 gap-3 flex-wrap">
-      <div class="flex items-center gap-3">
-        <div class="bg-red-700 text-white px-6 py-1.5 font-black text-sm tracking-widest shrink-0"
-             style="clip-path:polygon(8px 0,100% 0,calc(100% - 8px) 100%,0 100%)">
-          LEVELING BOARD
-        </div>
-        <div>
-          <p id="lb-linea" class="text-[10px] font-bold text-slate-400 uppercase tracking-wider">—</p>
-          <p id="lb-turno" class="text-xs font-bold text-[#0B3A5B]">—</p>
-        </div>
+    <div class="shrink-0 pb-2 border-b-2 flex justify-between items-end flex-wrap gap-2" style="border-color:var(--nc-accent)">
+      <div>
+        <h1 class="text-xl font-black tracking-tight" style="color:var(--nc-dark)">Leveling Board</h1>
+        <p class="text-[11px] text-slate-400 mt-0.5"><span id="lv-fecha">—</span> · plan (TPA) vs. real (POOL) por franja de 30 min, todas las líneas</p>
       </div>
-      <div class="flex items-center gap-3 bg-white px-4 py-2 rounded-xl shadow-sm border border-slate-200 text-[10px] font-bold">
-        <span class="material-symbols-outlined text-base text-[#339FC6]">timer</span>
-        <span class="text-slate-400 uppercase tracking-wider">Frecuencia de recolección</span>
-        <span id="lb-frecuencia" class="text-[#0B3A5B] text-sm">— min</span>
+      <div class="flex items-center gap-3 text-[9px] font-bold">
+        <div class="flex items-center gap-1.5"><span class="w-3 h-3 rounded-sm inline-block lv-cell-match"></span>TPA = POOL</div>
+        <div class="flex items-center gap-1.5"><span class="w-3 h-3 rounded-sm inline-block lv-cell-mismatch"></span>DESFASE</div>
+        <span class="text-slate-200">|</span>
+        <div class="flex items-center gap-1.5"><span class="w-3 h-3 rounded-full inline-block" style="background:var(--status-warning)"></span>Escalación Nivel 1 · Supervisor</div>
+        <div class="flex items-center gap-1.5"><span class="w-3 h-3 rounded-full inline-block" style="background:var(--status-critical)"></span>Escalación Nivel 2 · Gerente</div>
+        <button onclick="guardarPlan()"
+          class="px-3 py-1.5 rounded-lg text-white text-[10px] font-bold uppercase tracking-widest transition flex items-center gap-1.5"
+          style="background:var(--nc-dark)" onmouseover="this.style.background='var(--nc-primary)'" onmouseout="this.style.background='var(--nc-dark)'">
+          <span class="material-symbols-outlined text-sm">save</span>Guardar Plan
+        </button>
       </div>
     </div>
 
-    <div class="flex gap-2 items-center bg-white px-3 py-2 rounded-xl shadow-sm border border-slate-200 text-[9px] font-bold shrink-0 flex-wrap">
-      <span class="text-slate-400 uppercase tracking-wider">Estado</span>
-      <span class="text-slate-200">|</span>
-      <div class="flex items-center gap-1.5"><span class="w-3 h-3 rounded-sm inline-block" style="background:var(--status-ok)"></span>OK · &gt; 10 min para recolección</div>
-      <span class="text-slate-200">|</span>
-      <div class="flex items-center gap-1.5"><span class="w-3 h-3 rounded-sm inline-block" style="background:var(--status-warning)"></span>ATENCIÓN · 0–10 min</div>
-      <span class="text-slate-200">|</span>
-      <div class="flex items-center gap-1.5"><span class="w-3 h-3 rounded-sm inline-block" style="background:var(--status-critical)"></span>CRÍTICO · recolección vencida</div>
-    </div>
-
-    <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-y-auto flex-grow" style="min-height:0">
-      <table class="w-full text-left">
-        <thead class="bg-slate-50 border-b border-slate-200" style="position:sticky;top:0;z-index:5">
-          <tr>
-            <th class="py-2 px-4 text-[10px] font-bold text-slate-500 uppercase tracking-wider bg-slate-50">No. Parte / Modelo</th>
-            <th class="py-2 px-4 text-[10px] font-bold text-slate-500 uppercase tracking-wider bg-slate-50">Cliente</th>
-            <th class="py-2 px-4 text-[10px] font-bold text-slate-500 uppercase tracking-wider bg-slate-50">Cant. / Lote</th>
-            <th class="py-2 px-4 text-[10px] font-bold text-slate-500 uppercase tracking-wider bg-slate-50">Última recolección</th>
-            <th class="py-2 px-4 text-[10px] font-bold text-slate-500 uppercase tracking-wider bg-slate-50">Próxima recolección</th>
-            <th class="py-2 px-4 text-[10px] font-bold text-slate-500 uppercase tracking-wider bg-slate-50">Estado</th>
-            <th class="py-2 px-4 text-[10px] font-bold text-slate-500 uppercase tracking-wider bg-slate-50">Escalación</th>
-          </tr>
-        </thead>
-        <tbody id="lb-tbody" class="divide-y divide-slate-100"></tbody>
-      </table>
+    <div id="lv-scroll" class="bg-white rounded-xl border border-slate-200 shadow-sm flex-grow overflow-auto" style="min-height:0">
+      <table class="lv-table" id="lv-table" style="width:max-content"></table>
     </div>
   </div>
 </main>
 
 <script>
+  // ── Columnas fijas (sticky) a la izquierda del grid de franjas ─────────────────
+  const COLS = [
+    { key: 'alerta',         label: 'Alerta',         w: 100 },
+    { key: 'cliente',        label: 'Cliente',        w: 120 },
+    { key: 'sapModel',       label: 'SAP Model',      w: 100 },
+    { key: 'linea',          label: 'Línea',          w: 60  },
+    { key: 'recoleccion',    label: 'Recolección',    w: 80  },
+    { key: 'piezasPorPallet',label: 'Pzs/Pallet',     w: 60  },
+    { key: 'prioridad',      label: 'Prioridad',      w: 55  },
+    { key: 'cantidad',       label: 'Cantidad',       w: 60  },
+    { key: 'pallets',        label: 'Pallets',        w: 55  },
+    { key: 'horaInicio',     label: 'Hora Inicio',    w: 65  }
+  ];
+
+  const TIME_SLOTS = (() => {
+    const slots = [];
+    for (let i = 0; i < 48; i++) {
+      const total = (7 * 60 + i * 30) % (24 * 60);
+      const hh = String(Math.floor(total / 60)).padStart(2, '0');
+      const mm = String(total % 60).padStart(2, '0');
+      slots.push(`${hh}:${mm}`);
+    }
+    return slots;
+  })();
+
+  function currentSlotIndex() {
+    const now = new Date();
+    let diff = (now.getHours() * 60 + now.getMinutes()) - 7 * 60;
+    if (diff < 0) diff += 24 * 60;
+    return Math.floor(diff / 30);
+  }
+
+  function slotsVacios(overrides) {
+    const arr = TIME_SLOTS.map(() => ({ tpa: 0, pool: 0 }));
+    Object.entries(overrides ?? {}).forEach(([idx, val]) => { arr[idx] = val; });
+    return arr;
+  }
+
   // ── Datos de fallback (usados cuando el servidor no responde) ─────────────────
-  window.KANBAN_LEVELING_RECOLECCION = {
-    linea: "L-20 EM",
-    turno: "1er Turno",
-    frecuenciaMin: 30,
-    productos: [
-      { modeloId: 1, noParte: "A7911-205-06", cliente: "Mitsuba Monterrey", cantidadPorLote: 40,
-        ultimaRecoleccion: "09:30", proximaRecoleccion: "10:00", minutosRestantes: 22, estadoAlerta: "OK", nivelEscalacion: 0, escaladoA: null },
-      { modeloId: 2, noParte: "A3289-742-01", cliente: "Mitsuba Monterrey", cantidadPorLote: 32, ultimaRecoleccion: "09:15",
-        proximaRecoleccion: "09:45", minutosRestantes: 7, estadoAlerta: "ATENCION", nivelEscalacion: 0, escaladoA: null },
-      { modeloId: 3, noParte: "A9442-834-00", cliente: "Mitsuba Monterrey", cantidadPorLote: 28, ultimaRecoleccion: "08:50",
-        proximaRecoleccion: "09:20", minutosRestantes: -14, estadoAlerta: "CRITICO", nivelEscalacion: 1, escaladoA: "Supervisor de línea" },
-      { modeloId: 4, noParte: "A7460-314-06", cliente: "Mitsuba Monterrey", cantidadPorLote: 24, ultimaRecoleccion: "08:10",
-        proximaRecoleccion: "08:40", minutosRestantes: -38, estadoAlerta: "CRITICO", nivelEscalacion: 2, escaladoA: "Gerente de producción" }
+  window.KANBAN_LEVELING_PLANTA = {
+    fecha: 'Martes 11/03/2025',
+    filas: [
+      { cliente: 'PDP_2244_NISS H61P',   sapModel: 'PF8GE501BA',   linea: 'L-18',  recoleccion: 'PALLET',     piezasPorPallet: 100,  prioridad: 1, cantidad: 200,  pallets: 2.0,  horaInicio: '07:00', slots: slotsVacios({ 10: { tpa: 1, pool: 1 } }) },
+      { cliente: 'PDP_2244_NISSAN AV',   sapModel: 'CLA_EN6008PA', linea: 'L-1A',  recoleccion: 'PALLET',     piezasPorPallet: 320,  prioridad: 1, cantidad: 400,  pallets: 1.3,  horaInicio: '07:00', slots: slotsVacios({ 10: { tpa: 1, pool: 1 } }) },
+      { cliente: 'PDP_2244_AF2MITSUB',   sapModel: 'A7911-205-06', linea: 'L20EM', recoleccion: 'CONTENEDOR', piezasPorPallet: 80,   prioridad: 1, cantidad: 960,  pallets: 12.0, horaInicio: '07:00', slots: slotsVacios({ 4: { tpa: 3, pool: 3 }, 5: { tpa: 4, pool: 4 }, 6: { tpa: 4, pool: 3 }, 7: { tpa: 4, pool: 4 } }) },
+      { cliente: 'PDP_2244_AF2MITSUB',   sapModel: 'A3289-742-01', linea: 'L20EM', recoleccion: 'CONTENEDOR', piezasPorPallet: 40,   prioridad: 1, cantidad: 1740, pallets: 43.5, horaInicio: '07:00', slots: slotsVacios({ 3: { tpa: 4, pool: 4 }, 4: { tpa: 4, pool: 3 }, 5: { tpa: 3, pool: 3 }, 6: { tpa: 4, pool: 4 } }) },
+      { cliente: 'PDP_2244_AF2MITSUB',   sapModel: 'A9442-834-00', linea: 'L20EM', recoleccion: 'CONTENEDOR', piezasPorPallet: 40,   prioridad: 2, cantidad: 80,   pallets: 2.0,  horaInicio: '12:48', slots: slotsVacios({ 19: { tpa: 1, pool: 0 } }), nivelEscalacion: 1, escaladoA: 'Supervisor de línea' },
+      { cliente: 'PDP_2244_AF2MITSUB',   sapModel: 'A7460-314-06', linea: 'L20EM', recoleccion: 'CONTENEDOR', piezasPorPallet: 100,  prioridad: 1, cantidad: 600,  pallets: 6.0,  horaInicio: '07:00', slots: slotsVacios({ 8: { tpa: 2, pool: 2 } }) },
+      { cliente: 'PDP_2244_AF CK HC',    sapModel: '275W74KE0A',   linea: 'L21EM', recoleccion: 'PALLET',     piezasPorPallet: 1200, prioridad: 1, cantidad: 150,  pallets: 0.1,  horaInicio: '07:00', slots: slotsVacios() },
+      { cliente: 'PDP_2244_L-PC',        sapModel: 'X-WF2520D',    linea: 'L-PC',  recoleccion: 'PALLET',     piezasPorPallet: 96,   prioridad: 1, cantidad: 250,  pallets: 2.6,  horaInicio: '07:00', slots: slotsVacios({ 10: { tpa: 1, pool: 1 } }) },
+      { cliente: 'PDP_2244_DENSO T',     sapModel: 'CLA_EF3251IG', linea: 'L-01',  recoleccion: 'PALLET',     piezasPorPallet: 1920, prioridad: 1, cantidad: 1000, pallets: 0.5,  horaInicio: '07:00', slots: slotsVacios({ 5: { tpa: 1, pool: 1 } }) },
+      { cliente: 'PDP_2244_RIVIAN RT',   sapModel: 'PF876510AA',   linea: 'L-05B', recoleccion: 'PALLET',     piezasPorPallet: 2240, prioridad: 1, cantidad: 300,  pallets: 0.1,  horaInicio: '07:00', slots: slotsVacios() },
+      { cliente: 'PDP_2244_FORD1AUDI',   sapModel: 'PF8G8501BA',   linea: 'L-07',  recoleccion: 'PALLET',     piezasPorPallet: 64,   prioridad: 1, cantidad: 704,  pallets: 11.0, horaInicio: '07:00', slots: slotsVacios({ 4: { tpa: 1, pool: 1 }, 6: { tpa: 1, pool: 1 }, 7: { tpa: 1, pool: 0 }, 9: { tpa: 1, pool: 1 } }), nivelEscalacion: 2, escaladoA: 'Gerente de producción' }
     ]
   };
 
-  const LB_API_GET = '/kanban/leveling-recoleccion/get';
+  const LV_API_GET  = '/kanban/leveling-planta/get';
+  const LV_API_POST = '/kanban/leveling-planta/post';
 
   async function cargarDesdeServidor() {
     try {
-      const res = await fetch(LB_API_GET, { method: 'GET', headers: { 'Accept': 'application/json' } });
+      const res = await fetch(LV_API_GET, { method: 'GET', headers: { 'Accept': 'application/json' } });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
-      if (data && typeof data === 'object') window.KANBAN_LEVELING_RECOLECCION = data;
+      if (data && typeof data === 'object') window.KANBAN_LEVELING_PLANTA = data;
     } catch (e) {
       console.warn('[LevelingBoard] Servidor no disponible, usando datos locales:', e.message);
     }
     render();
   }
 
-  function badge(estado) {
-    const map = {
-      OK:       { cls: 'bg-green-100 text-green-700',  txt: 'OK' },
-      ATENCION: { cls: 'bg-amber-100 text-amber-700',  txt: 'ATENCIÓN' },
-      CRITICO:  { cls: 'bg-red-100 text-red-700',      txt: 'CRÍTICO' }
-    };
-    const m = map[estado] ?? map.OK;
-    return `<span class="px-3 py-1 rounded-full text-[10px] font-black uppercase ${m.cls}">${m.txt}</span>`;
+  function updateTpa(filaIdx, slotIdx, value) {
+    window.KANBAN_LEVELING_PLANTA.filas[filaIdx].slots[slotIdx].tpa = value === '' ? 0 : Number(value);
   }
 
-  function escalacion(p) {
-    if (!p.nivelEscalacion) return '<span class="text-slate-300 text-xs">—</span>';
-    const color = p.nivelEscalacion >= 2 ? 'text-red-600' : 'text-amber-600';
-    return `<span class="text-xs font-bold ${color}">Nivel ${p.nivelEscalacion} · ${p.escaladoA ?? ''}</span>`;
+  async function guardarPlan() {
+    try {
+      await fetch(LV_API_POST, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ fecha: window.KANBAN_LEVELING_PLANTA.fecha, filas: window.KANBAN_LEVELING_PLANTA.filas, timestamp: new Date().toISOString() })
+      });
+    } catch (e) {
+      console.warn('[LevelingBoard.guardarPlan]', e.message);
+    }
+  }
+
+  function sticky(leftPx, widthPx, extra = '') {
+    return `position:sticky;left:${leftPx}px;z-index:3;width:${widthPx}px;min-width:${widthPx}px;max-width:${widthPx}px;background:inherit;${extra}`;
+  }
+
+  function escalacionBadge(f) {
+    const nivel = f.nivelEscalacion ?? 0;
+    if (!nivel) return `<span class="text-[9px] font-black uppercase" style="color:var(--status-ok)">OK</span>`;
+    const color = nivel >= 2 ? 'var(--status-critical)' : 'var(--status-warning)';
+    return `<span class="text-[9px] font-black uppercase" style="color:${color}" title="${f.escaladoA ?? ''}">Nivel ${nivel}</span>`;
   }
 
   function render() {
-    const data = window.KANBAN_LEVELING_RECOLECCION;
-    document.getElementById('lb-linea').textContent = data.linea ?? '—';
-    document.getElementById('lb-turno').textContent = data.turno ?? '—';
-    document.getElementById('lb-frecuencia').textContent = `${data.frecuenciaMin ?? '—'} min`;
+    const data = window.KANBAN_LEVELING_PLANTA;
+    document.getElementById('lv-fecha').textContent = data.fecha ?? '—';
 
-    document.getElementById('lb-tbody').innerHTML = (data.productos ?? []).map(p => `
-      <tr class="alert-row-${p.estadoAlerta} hover:bg-blue-50/30 transition-colors">
-        <td class="py-3 px-4">
-          <div class="font-bold text-sm text-[#0B3A5B]">${p.noParte}</div>
-        </td>
-        <td class="py-3 px-4 text-xs font-semibold text-slate-500">${p.cliente}</td>
-        <td class="py-3 px-4 font-mono text-sm font-bold text-[#0B3A5B]">${p.cantidadPorLote}</td>
-        <td class="py-3 px-4 font-mono text-xs text-slate-500">${p.ultimaRecoleccion}</td>
-        <td class="py-3 px-4">
-          <div class="font-mono text-xs font-bold text-[#0B3A5B]">${p.proximaRecoleccion}</div>
-          <div class="text-[10px] font-bold ${p.minutosRestantes < 0 ? 'text-red-500' : 'text-slate-400'}">
-            ${p.minutosRestantes < 0 ? `vencida hace ${Math.abs(p.minutosRestantes)} min` : `en ${p.minutosRestantes} min`}
-          </div>
-        </td>
-        <td class="py-3 px-4">${badge(p.estadoAlerta)}</td>
-        <td class="py-3 px-4">${escalacion(p)}</td>
-      </tr>
-    `).join('');
+    let left = 0;
+    const offsets = COLS.map(c => { const o = left; left += c.w; return o; });
+    const FIXED_W = left;
+    const nowIdx = currentSlotIndex();
+
+    const theadRow1 = `
+      <tr>
+        ${COLS.map((c, i) => `<th style="${sticky(offsets[i], c.w, 'z-index:6;' + (i === COLS.length - 1 ? 'border-right:2px solid #94a3b8' : ''))}">${c.label}</th>`).join('')}
+        ${TIME_SLOTS.map((t, i) => `<th colspan="2" style="background:var(--nc-primary);color:#fff;${i === nowIdx ? 'outline:2px solid #fff;outline-offset:-2px' : ''}">${t}</th>`).join('')}
+      </tr>`;
+    const theadRow2 = `
+      <tr>
+        <th colspan="${COLS.length}" style="position:sticky;left:0;z-index:6;width:${FIXED_W}px;min-width:${FIXED_W}px;background:var(--nc-light);border-right:2px solid #94a3b8"></th>
+        ${TIME_SLOTS.map(() => `<th style="background:var(--nc-dark);color:#fff;width:34px;min-width:34px">TPA</th><th style="background:var(--nc-dark);color:rgba(255,255,255,.5);width:34px;min-width:34px">POOL</th>`).join('')}
+      </tr>`;
+
+    const tbody = (data.filas ?? []).map((f, fi) => `
+      <tr class="hover:bg-blue-50/40 transition-colors">
+        ${COLS.map((c, i) => `<td style="${sticky(offsets[i], c.w, 'background:#fff;' + (i === COLS.length - 1 ? 'border-right:2px solid #94a3b8' : ''))}${c.key === 'cliente' ? 'text-align:left;padding-left:6px;font-weight:700' : ''}">${c.key === 'alerta' ? escalacionBadge(f) : f[c.key]}</td>`).join('')}
+        ${f.slots.map((s, si) => {
+          const match = Number(s.tpa) === Number(s.pool);
+          const cls = match ? 'lv-cell-match' : 'lv-cell-mismatch';
+          const cur = si === nowIdx ? 'lv-cell-current' : '';
+          return `
+            <td class="${cls} ${cur}"><input class="tpa-input" type="number" min="0" value="${s.tpa}"
+              oninput="updateTpa(${fi}, ${si}, this.value)" onchange="render()"></td>
+            <td class="${cls} ${cur}">${s.pool}</td>`;
+        }).join('')}
+      </tr>`).join('');
+
+    document.getElementById('lv-table').innerHTML = `<thead>${theadRow1}${theadRow2}</thead><tbody>${tbody}</tbody>`;
   }
 
   render();

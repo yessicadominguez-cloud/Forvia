@@ -1,0 +1,952 @@
+<!DOCTYPE html>
+<html class="light" lang="es">
+<head>
+  <meta charset="utf-8"/>
+  <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+  <title>NC Tech MES - Kanban Digital · Honda 25SA</title>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans:wght@400;500;600;700;900&display=swap" rel="stylesheet"/>
+  <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
+  <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; }
+    html, body { height: 100%; margin: 0; font-family: 'Noto Sans', sans-serif; background: #F0F4F8; color: #0B3A5B; overflow: hidden; }
+    #app { display: flex; flex-direction: column; height: 100vh; }
+    #main-content { flex: 1 1 0; overflow: hidden; }
+
+    :root {
+      --nc-dark: #0B3A5B;
+      --nc-primary: #034A77;
+      --nc-accent: #339FC6;
+      --nc-light: #BFEDF6;
+      --status-ok: #10b981;
+      --status-warning: #f59e0b;
+      --status-critical: #ef4444;
+    }
+
+    .cards-grid-container { display: flex; flex-direction: column; height: 100%; gap: 0.4rem; }
+    .card-item { flex: 1; min-height: 0; }
+    .kanban-card { transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1); }
+
+    .leveling-table { border-collapse: collapse; font-size: 10px; }
+    .leveling-table th, .leveling-table td { border: 1px solid #e2e8f0; padding: 4px; text-align: center; }
+    .leveling-table thead th { background-color: #f8fafc; font-weight: 800; text-transform: uppercase; }
+    .cell-input { width: 100%; border: none; text-align: center; background: transparent; outline: none; font-family: 'Noto Sans', sans-serif; font-size: 10px; }
+    .cell-input:focus { background: #e0f2fe; }
+    .cell-input[type=number]::-webkit-inner-spin-button,
+    .cell-input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+    .cell-input[type=number] { -moz-appearance: textfield; appearance: textfield; }
+
+    .bg-alert-ok    { background-color: #10b981; color: white; }
+    .bg-alert-yellow{ background-color: #fef08a; color: #854d0e; }
+    .bg-alert-orange{ background-color: #fed7aa; color: #9a3412; }
+    .bg-alert-red   { background-color: #fecaca; color: #991b1b; }
+    .bg-alert-repro { background-color: #e2e8f0; color: #1e293b; }
+
+    .nav-btn.active { background-color: rgba(255,255,255,0.2); color: #BFEDF6; }
+
+    .modal-overlay {
+      background-color: rgba(11,58,91,0.6);
+      backdrop-filter: blur(4px);
+      display: none; position: fixed; inset: 0; z-index: 200;
+      align-items: center; justify-content: center; padding: 1rem;
+    }
+  </style>
+</head>
+<body>
+
+<div id="app">
+
+  <!-- Header -->
+  <header class="flex items-center justify-between px-4 h-12 bg-[#0B3A5B] border-b border-slate-700 shadow-sm relative flex-shrink-0">
+    <img alt="NC Tech Logo" src="logo_nctech.png" class="h-8 w-auto object-contain flex-shrink-0"/>
+    <div class="absolute left-1/2 -translate-x-1/2 pointer-events-none flex items-center gap-3 whitespace-nowrap">
+      <span style="color:#BFEDF6;font-weight:700;font-size:0.6rem;letter-spacing:0.12em;text-transform:uppercase">Honda 25SA</span>
+      <div style="width:1px;height:22px;background:rgba(255,255,255,0.25)"></div>
+      <span style="color:#fff;font-weight:900;font-size:0.85rem;letter-spacing:0.2em;text-transform:uppercase">Kanban Digital</span>
+    </div>
+    <nav class="flex gap-1 flex-shrink-0">
+      <button onclick="switchModule('leveling')" data-module="leveling"
+              class="nav-btn px-3 py-1.5 rounded text-xs font-bold text-white hover:bg-white/10 transition flex items-center gap-1">
+        <span class="material-symbols-outlined text-sm">table_chart</span>
+        <span class="hidden sm:inline">LEVELING</span>
+      </button>
+      <button onclick="switchModule('line')" data-module="line"
+              class="nav-btn px-3 py-1.5 rounded text-xs font-bold text-white hover:bg-white/10 transition flex items-center gap-1">
+        <span class="material-symbols-outlined text-sm">monitor</span>
+        <span class="hidden sm:inline">LÍNEA</span>
+      </button>
+      <button onclick="switchModule('supplier')" data-module="supplier"
+              class="nav-btn px-3 py-1.5 rounded text-xs font-bold text-white hover:bg-white/10 transition flex items-center gap-1">
+        <span class="material-symbols-outlined text-sm">local_shipping</span>
+        <span class="hidden sm:inline">SURTIDOR</span>
+      </button>
+      <button onclick="switchModule('admin')" data-module="admin"
+              class="nav-btn px-3 py-1.5 rounded text-xs font-bold text-white hover:bg-white/10 transition flex items-center gap-1">
+        <span class="material-symbols-outlined text-sm">settings</span>
+        <span class="hidden sm:inline">ADMIN</span>
+      </button>
+    </nav>
+  </header>
+
+  <main id="main-content" class="p-3"></main>
+
+  <!-- ── Modal: Agregar / Editar fila del Leveling Board ─────────────────────── -->
+  <div id="modal-leveling" class="modal-overlay">
+    <div class="bg-white w-full max-w-md rounded-xl shadow-2xl border border-slate-200 overflow-hidden">
+      <div class="bg-[#0B3A5B] px-6 py-4 flex justify-between items-center text-white">
+        <div class="flex items-center gap-3">
+          <span class="material-symbols-outlined text-[#339FC6]" style='font-variation-settings:"FILL" 1'>table_rows</span>
+          <h2 id="ml-title" class="text-base font-bold tracking-tight">Agregar fila</h2>
+        </div>
+        <button onclick="closeLevelingModal()" class="text-white/70 hover:text-white">
+          <span class="material-symbols-outlined">close</span>
+        </button>
+      </div>
+      <div class="p-6 space-y-5">
+        <div>
+          <label class="text-xs font-bold text-[#0B3A5B] uppercase tracking-wider block mb-2">Modelo</label>
+          <div class="relative">
+            <select id="ml-modelo" onchange="onModeloSelect()"
+              class="w-full border-2 border-slate-300 rounded-lg pl-3 pr-10 py-2.5 text-sm font-semibold text-[#0B3A5B] focus:border-[#339FC6] focus:ring-2 focus:ring-[#339FC6]/20 outline-none transition-all appearance-none bg-white">
+              <option value="">— Seleccionar modelo —</option>
+            </select>
+            <div class="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-slate-400">
+              <span class="material-symbols-outlined text-[20px]">expand_more</span>
+            </div>
+          </div>
+        </div>
+        <div class="grid grid-cols-2 gap-3 p-4 bg-slate-50 rounded-xl border border-slate-200">
+          <div>
+            <p class="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-0.5">Cliente</p>
+            <p id="ml-cliente" class="text-sm font-bold text-[#0B3A5B]">—</p>
+          </div>
+          <div>
+            <p class="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-0.5">SAP Model</p>
+            <p id="ml-sap" class="text-sm font-bold text-[#0B3A5B]">—</p>
+          </div>
+          <div>
+            <p class="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-0.5">Batch Estándar</p>
+            <p id="ml-cantidad" class="text-sm font-bold text-[#0B3A5B]">—</p>
+          </div>
+          <div>
+            <p class="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-0.5">Piezas / Pallet</p>
+            <p id="ml-pps" class="text-sm font-bold text-[#0B3A5B]">—</p>
+          </div>
+        </div>
+        <div id="ml-error" class="hidden text-red-700 text-xs font-semibold bg-red-50 border border-red-200 rounded-lg px-4 py-3 flex items-center gap-2">
+          <span class="material-symbols-outlined text-base flex-shrink-0">error</span>
+          <span id="ml-error-txt"></span>
+        </div>
+      </div>
+      <div class="px-6 pb-6 flex gap-3 border-t border-slate-100 pt-4">
+        <button onclick="closeLevelingModal()"
+          class="flex-1 border-2 border-[#0B3A5B] text-[#0B3A5B] py-2.5 rounded-lg text-xs font-bold uppercase tracking-widest hover:bg-slate-50 transition">
+          Cancelar
+        </button>
+        <button onclick="saveLevelingRow()"
+          class="flex-1 bg-[#0B3A5B] hover:bg-[#034A77] text-white py-2.5 rounded-lg text-xs font-bold uppercase tracking-widest transition flex items-center justify-center gap-2">
+          <span class="material-symbols-outlined text-sm">save</span>
+          <span id="ml-save-label">Agregar</span>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Modal: Agregar / Editar modelo (Admin) ──────────────────────────────── -->
+  <div id="modal-admin" class="modal-overlay">
+    <div class="bg-white w-full max-w-md rounded-xl shadow-2xl border border-slate-200 overflow-hidden">
+      <div class="bg-[#0B3A5B] px-6 py-4 flex justify-between items-center text-white">
+        <div class="flex items-center gap-3">
+          <span class="material-symbols-outlined text-[#339FC6]" style='font-variation-settings:"FILL" 1'>precision_manufacturing</span>
+          <h2 id="ma-title" class="text-base font-bold tracking-tight">Agregar Modelo</h2>
+        </div>
+        <button onclick="closeAdminModal()" class="text-white/70 hover:text-white">
+          <span class="material-symbols-outlined">close</span>
+        </button>
+      </div>
+      <div class="p-6 space-y-4">
+        <!-- Línea fija (solo lectura) -->
+        <div class="flex items-center gap-3 px-4 py-3 bg-[#BFEDF6]/40 rounded-xl border border-[#BFEDF6]">
+          <span class="material-symbols-outlined text-[#339FC6]" style="font-size:20px">precision_manufacturing</span>
+          <div>
+            <p class="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Línea</p>
+            <p class="text-sm font-bold text-[#0B3A5B]">Honda 25SA</p>
+          </div>
+        </div>
+        <!-- Nombre del modelo -->
+        <div>
+          <label class="text-xs font-bold text-[#0B3A5B] uppercase tracking-wider block mb-2">Modelo</label>
+          <input id="ma-nombre" type="text" placeholder="Ej: 25SA Type-A"
+            class="w-full border-2 border-slate-300 rounded-lg px-3 py-2.5 text-sm text-[#0B3A5B] font-semibold focus:border-[#339FC6] focus:ring-2 focus:ring-[#339FC6]/20 outline-none transition-all"/>
+        </div>
+        <!-- Umbral, Estándar, PPS -->
+        <div class="grid grid-cols-3 gap-3">
+          <div>
+            <label class="text-xs font-bold text-[#0B3A5B] uppercase tracking-wider block mb-2">Umbral</label>
+            <div class="relative">
+              <input id="ma-umbral" type="number" min="1" value="4"
+                class="w-full border-2 border-slate-300 rounded-lg px-3 py-2.5 text-sm text-[#0B3A5B] font-semibold focus:border-[#339FC6] focus:ring-2 focus:ring-[#339FC6]/20 outline-none transition-all"/>
+              <span class="absolute right-2 top-1/2 -translate-y-1/2 text-[9px] text-slate-400 font-bold pointer-events-none">uds</span>
+            </div>
+          </div>
+          <div>
+            <label class="text-xs font-bold text-[#0B3A5B] uppercase tracking-wider block mb-2">Estándar</label>
+            <div class="relative">
+              <input id="ma-estandar" type="number" min="1" value="12"
+                class="w-full border-2 border-slate-300 rounded-lg px-3 py-2.5 text-sm text-[#0B3A5B] font-semibold focus:border-[#339FC6] focus:ring-2 focus:ring-[#339FC6]/20 outline-none transition-all"/>
+              <span class="absolute right-2 top-1/2 -translate-y-1/2 text-[9px] text-slate-400 font-bold pointer-events-none">uds</span>
+            </div>
+          </div>
+          <div>
+            <label class="text-xs font-bold text-[#0B3A5B] uppercase tracking-wider block mb-2">Pzs/Pallet</label>
+            <input id="ma-pps" type="number" min="1"
+              class="w-full border-2 border-slate-300 rounded-lg px-3 py-2.5 text-sm text-[#0B3A5B] font-semibold focus:border-[#339FC6] focus:ring-2 focus:ring-[#339FC6]/20 outline-none transition-all"/>
+          </div>
+        </div>
+        <div id="ma-error" class="hidden text-red-700 text-xs font-semibold bg-red-50 border border-red-200 rounded-lg px-4 py-3 flex items-center gap-2">
+          <span class="material-symbols-outlined text-base flex-shrink-0">error</span>
+          <span id="ma-error-txt"></span>
+        </div>
+      </div>
+      <div class="px-6 pb-6 flex gap-3 border-t border-slate-100 pt-4">
+        <button onclick="closeAdminModal()"
+          class="flex-1 border-2 border-[#0B3A5B] text-[#0B3A5B] py-2.5 rounded-lg text-xs font-bold uppercase tracking-widest hover:bg-slate-50 transition">
+          Cancelar
+        </button>
+        <button onclick="saveAdminModel()"
+          class="flex-1 bg-[#0B3A5B] hover:bg-[#034A77] text-white py-2.5 rounded-lg text-xs font-bold uppercase tracking-widest transition flex items-center justify-center gap-2">
+          <span class="material-symbols-outlined text-sm">save</span>
+          <span id="ma-save-label">Agregar</span>
+        </button>
+      </div>
+    </div>
+  </div>
+
+</div><!-- /#app -->
+
+<!-- Modal Surtir Producto -->
+<div id="modal-surtir" style="display:none"
+  class="fixed inset-0 z-[200] flex items-center justify-center bg-black/40 backdrop-blur-sm">
+  <div class="bg-white rounded-2xl shadow-2xl w-full max-w-sm mx-4 overflow-hidden">
+    <div class="bg-[#0B3A5B] px-6 py-4 flex items-center justify-between">
+      <h3 class="text-white font-black text-base tracking-wide">Surtir Producto</h3>
+      <button onclick="closeSurtirModal()"
+        class="text-white/70 hover:text-white transition">
+        <span class="material-symbols-outlined">close</span>
+      </button>
+    </div>
+    <div class="p-6 flex flex-col gap-4">
+      <div class="flex flex-col gap-1.5">
+        <label class="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Modelo</label>
+        <select id="ms-modelo"
+          class="border border-slate-200 rounded-lg px-3 py-2.5 text-sm font-bold text-[#0B3A5B] focus:outline-none focus:ring-2 focus:ring-[#339FC6]">
+        </select>
+      </div>
+      <div class="flex flex-col gap-1.5">
+        <label class="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Cantidad</label>
+        <input id="ms-cantidad" type="number" min="1" placeholder="0"
+          class="border border-slate-200 rounded-lg px-3 py-2.5 text-sm font-bold text-[#0B3A5B] focus:outline-none focus:ring-2 focus:ring-[#339FC6]" />
+      </div>
+      <div id="ms-error" class="hidden bg-red-50 border border-red-200 rounded-lg px-3 py-2 text-xs font-bold text-red-600">
+        <span id="ms-error-txt"></span>
+      </div>
+    </div>
+    <div class="px-6 pb-6 flex gap-3 justify-end">
+      <button onclick="closeSurtirModal()"
+        class="px-4 py-2.5 rounded-lg border border-slate-200 text-slate-500 text-xs font-bold hover:bg-slate-50 transition">
+        Cancelar
+      </button>
+      <button onclick="confirmarSurtido()"
+        class="px-5 py-2.5 rounded-lg bg-[#339FC6] hover:bg-[#034A77] text-white text-xs font-bold uppercase tracking-widest transition shadow-sm">
+        Aceptar
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- Archivos de integración con sistema externo -->
+<script src="kanban_linea_surtidor.js"></script>
+<script src="kanban_leveling.js"></script>
+<script src="kanban_admin.js"></script>
+<script src="kanban_line_cards.js"></script>
+
+<script>
+  // ── Modelos de la línea Honda 25SA ──────────────────────────────────────────
+  // LineasSurtidor.cargar() actualiza este array desde window.KANBAN_LINEA_SURTIDOR
+  let models = [
+    { id: 1, name: '25SA Type-A', customer: 'HONDA', line: 'Honda 25SA', collect: 'PALLET', pps: 80,  priority: 1, quantity: 960,  prefix: 'H25A', occupied: 12, max: 12, limit: 4 },
+    { id: 2, name: '25SA Type-B', customer: 'HONDA', line: 'Honda 25SA', collect: 'PALLET', pps: 64,  priority: 1, quantity: 640,  prefix: 'H25B', occupied: 6,  max: 10, limit: 3 },
+    { id: 3, name: '25SA Sport',  customer: 'HONDA', line: 'Honda 25SA', collect: 'PALLET', pps: 48,  priority: 1, quantity: 576,  prefix: 'H25S', occupied: 3,  max: 12, limit: 4 },
+    { id: 4, name: '25SA EV',     customer: 'HONDA', line: 'Honda 25SA', collect: 'PALLET', pps: 100, priority: 1, quantity: 1200, prefix: 'H25E', occupied: 11, max: 12, limit: 4 }
+  ];
+
+  // Día completo en bloques de 30 min, desde las 07:00 (48 franjas → 07:00 a 06:30 del día siguiente)
+  const TIME_SLOTS = (() => {
+    const slots = [];
+    for (let i = 0; i < 48; i++) {
+      const total = (7 * 60 + i * 30) % (24 * 60);
+      const hh = String(Math.floor(total / 60)).padStart(2, '0');
+      const mm = String(total % 60).padStart(2, '0');
+      slots.push(`${hh}:${mm}`);
+    }
+    return slots;
+  })();
+
+  // Índice de la franja de 30 min correspondiente a la hora actual (0..47, base 07:00)
+  function currentSlotIndex() {
+    const now = new Date();
+    let diff = (now.getHours() * 60 + now.getMinutes()) - 7 * 60;
+    if (diff < 0) diff += 24 * 60;
+    return Math.floor(diff / 30);
+  }
+
+  // ── Estado del Leveling Board ───────────────────────────────────────────────
+  let levelingRows = models.map((m, i) => ({
+    rowId:   i + 1,
+    modelId: m.id,
+    slots:   TIME_SLOTS.map(() => ({ tpa: '', pool: '' }))
+  }));
+  let nextRowId = models.length + 1;
+  let editingRowId = null;
+
+  // ── Estado del Admin ────────────────────────────────────────────────────────
+  let adminNextId    = models.length + 1;
+  let editingAdminId = null;
+
+  // ── Navegación ──────────────────────────────────────────────────────────────
+  let currentModule  = 'leveling';
+  let currentModelId = 1;
+
+  function switchModule(module) {
+    currentModule = module;
+    render();
+  }
+
+  function render() {
+    const container = document.getElementById('main-content');
+    container.innerHTML = '';
+    document.querySelectorAll('.nav-btn').forEach(btn =>
+      btn.classList.toggle('active', btn.dataset.module === currentModule)
+    );
+    if      (currentModule === 'leveling') renderLeveling(container);
+    else if (currentModule === 'line')     renderLine(container);
+    else if (currentModule === 'supplier') renderSupplier(container);
+    else if (currentModule === 'admin')    renderAdmin(container);
+  }
+
+  // ── LEVELING BOARD ─────────────────────────────────────────────────────────
+  function renderLeveling(container) {
+    const _prevScroll = document.getElementById('leveling-scroll')?.scrollLeft;
+
+    // Columnas fijas (no horarias) que quedan ancladas a la izquierda mientras
+    // las franjas de tiempo hacen scroll. left/w en px, deben coincidir entre sí.
+    const FIX = [
+      { left: 0,   w: 120 },  // LINEA
+      { left: 120, w: 80  },  // RECOLECCIÓN
+      { left: 200, w: 60  },  // PZS/PALLET
+      { left: 260, w: 64  },  // CANTIDAD
+      { left: 324, w: 60  }   // PALLETS
+    ];
+    const FIXED_W = 384;      // suma de anchos de las columnas fijas
+    const sticky = (i, bg, extra = '') =>
+      `position:sticky;left:${FIX[i].left}px;z-index:6;width:${FIX[i].w}px;` +
+      `min-width:${FIX[i].w}px;max-width:${FIX[i].w}px;background:${bg};${extra}`;
+
+    // Solo se muestran modelos con datos (tarjetas/pool del CSV)
+    const filas = levelingRows.filter(row => {
+      const m = models.find(x => x.id === row.modelId);
+      if (!m) return false;
+      const tienePool = row.slots.some(s => s.pool !== '' && s.pool != null);
+      return (m.occupied || 0) > 0 || tienePool;
+    });
+
+    container.innerHTML = `
+      <div style="display:flex;flex-direction:column;gap:12px;height:calc(100vh - 3rem - 24px)">
+
+        <div class="flex justify-between items-center shrink-0 gap-3">
+          <div class="flex items-center gap-3">
+            <div class="bg-red-700 text-white px-6 py-1.5 font-black text-sm tracking-widest shrink-0"
+                 style="clip-path:polygon(8px 0,100% 0,calc(100% - 8px) 100%,0 100%)">
+              LEVELING BOARD
+            </div>
+            <div>
+              <p class="text-[10px] font-bold text-slate-400 uppercase tracking-wider">FAU-F-PSG-4640</p>
+              <p class="text-xs font-bold text-[#0B3A5B]">${new Date().toLocaleDateString('es-MX',{weekday:'long',year:'numeric',month:'long',day:'numeric'})}</p>
+            </div>
+          </div>
+          <div class="flex items-center gap-3">
+            <div class="flex gap-2 items-center bg-white px-3 py-2 rounded-xl shadow-sm border border-slate-200 text-[9px] font-bold">
+              <span class="text-slate-400 uppercase tracking-wider">Estado del proceso</span>
+              <span class="text-slate-200">|</span>
+              <div class="flex items-center gap-1.5"><span class="w-3 h-3 rounded-sm inline-block" style="background:#bbf7d0;border:1px solid #86efac"></span>OK · TPA = POOL</div>
+              <span class="text-slate-200">|</span>
+              <div class="flex items-center gap-1.5"><span class="w-3 h-3 rounded-sm bg-alert-yellow border border-yellow-300 inline-block"></span>DESFASE · TPA ≠ POOL</div>
+            </div>
+            <button onclick="guardarPlanLeveling()"
+              class="px-4 py-2 rounded-lg bg-[#0B3A5B] hover:bg-[#034A77] text-white text-xs font-bold uppercase tracking-widest transition shadow-sm flex items-center gap-1.5 shrink-0">
+              <span class="material-symbols-outlined text-sm">save</span>Guardar Plan
+            </button>
+          </div>
+        </div>
+
+        <div id="leveling-scroll" style="flex:1 1 0;min-height:0;overflow:auto;border-radius:0.75rem;border:1px solid #e2e8f0;background:white;box-shadow:0 1px 3px 0 rgb(0 0 0/.1)">
+          <table class="leveling-table" style="width:max-content;min-width:100%">
+            <thead>
+              <tr>
+                <th style="${sticky(0, '#BFEDF6', 'text-align:left;padding-left:6px;white-space:nowrap')}">LINEA</th>
+                <th style="${sticky(1, '#BFEDF6', 'white-space:nowrap;font-size:8px')}">RECOLECCIÓN</th>
+                <th style="${sticky(2, '#BFEDF6', 'white-space:nowrap;font-size:8px')}">PZS/PALLET</th>
+                <th style="${sticky(3, '#BFEDF6', 'white-space:nowrap;font-size:8px')}">CANTIDAD</th>
+                <th style="${sticky(4, '#BFEDF6', 'white-space:nowrap;font-size:8px;border-right:2px solid #94a3b8')}">PALLETS</th>
+                ${TIME_SLOTS.map(t => `<th colspan="2" style="background:#0B3A5B;color:white;border-left:2px solid rgba(255,255,255,0.15);white-space:nowrap;width:104px">${t}</th>`).join('')}
+              </tr>
+              <tr>
+                <th style="position:sticky;left:0;z-index:6;width:${FIXED_W}px;min-width:${FIXED_W}px;background:#BFEDF6;border-right:2px solid #94a3b8" colspan="5"></th>
+                ${TIME_SLOTS.map(() => `
+                  <th style="background:#034A77;color:white;font-size:7px;width:52px;min-width:52px">TPA</th>
+                  <th style="background:#034A77;color:rgba(255,255,255,0.5);font-size:7px;width:52px;min-width:52px">POOL</th>
+                `).join('')}
+              </tr>
+            </thead>
+            <tbody>
+              ${filas.length === 0 ? `
+                <tr><td colspan="${5 + TIME_SLOTS.length * 2}"
+                  style="padding:2rem;text-align:center;color:#94a3b8;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.05em">
+                  Sin datos de producción para mostrar
+                </td></tr>
+              ` : filas.map(row => {
+                const m = models.find(x => x.id === row.modelId);
+                if (!m) return '';
+                const pallets = m.pps > 0 ? Math.ceil(m.quantity / m.pps) : 0;
+                return `
+                  <tr class="hover:bg-blue-50/40 transition-colors">
+                    <td style="${sticky(0, '#fff', 'text-align:left;padding-left:6px;white-space:nowrap;font-weight:700')}">${m.name}</td>
+                    <td style="${sticky(1, '#fff', 'white-space:nowrap')}">${m.collect}</td>
+                    <td class="font-mono" style="${sticky(2, '#fff')}">${m.pps}</td>
+                    <td class="font-mono" style="${sticky(3, '#e0f2fe')}">${m.quantity}</td>
+                    <td class="font-mono" style="${sticky(4, '#e0f2fe', 'border-right:2px solid #94a3b8')}">${pallets}</td>
+                    ${TIME_SLOTS.map((_, idx) => {
+                      const slot    = row.slots[idx] ?? {tpa:'',pool:''};
+                      // Celdas vacías se tratan como 0 (y se rellenan con 0)
+                      const tpaStr  = (slot.tpa  === '' || slot.tpa  == null) ? '0' : String(slot.tpa);
+                      const poolStr = (slot.pool === '' || slot.pool == null) ? '0' : String(slot.pool);
+                      // Alarma: verde si TPA coincide con POOL, amarillo si no
+                      const coincide  = Number(tpaStr) === Number(poolStr);
+                      const alarmBg   = coincide ? '#bbf7d0' : '#fef08a';
+                      const alarmText = coincide ? '#166534' : '#854d0e';
+                      return (
+                      `<td style="border-left:2px solid #e2e8f0;background:${alarmBg}">
+                        <input class="cell-input" type="number" min="0" step="1"
+                               oninput="updateSlot(${row.rowId},${idx},'tpa',this.value)"
+                               onchange="renderLeveling(document.getElementById('main-content'))"
+                               onfocus="this.select()"
+                               value="${tpaStr}" style="color:${alarmText};font-weight:700">
+                      </td>
+                      <td style="background:${alarmBg}">
+                        <input class="cell-input" type="number" min="0" step="1"
+                               value="${poolStr}" disabled
+                               style="color:${alarmText};font-weight:700;cursor:not-allowed">
+                      </td>`
+                    ); }).join('')}
+                  </tr>
+                `;
+              }).join('')}
+            </tbody>
+          </table>
+        </div>
+
+      </div>
+    `;
+
+    // Scroll horizontal: preserva la posición entre refrescos; en la primera
+    // entrada al tablero se desplaza solo a la franja de la hora actual.
+    const scrollEl = document.getElementById('leveling-scroll');
+    if (scrollEl) {
+      if (_prevScroll != null) {
+        scrollEl.scrollLeft = _prevScroll;
+      } else {
+        const SLOT_W = 104;   // ancho de cada franja (TPA + POOL)
+        // Las columnas fijas son sticky, así que el desplazamiento se mide solo
+        // sobre las franjas: deja la hora actual visible junto a las columnas fijas.
+        scrollEl.scrollLeft = Math.max(0, currentSlotIndex() * SLOT_W - 60);
+      }
+    }
+  }
+
+  // ── MODAL LEVELING ──────────────────────────────────────────────────────────
+  function openLevelingModal(rowId) {
+    editingRowId = rowId;
+    const isEdit = rowId !== null;
+    document.getElementById('ml-title').textContent      = isEdit ? 'Editar fila' : 'Agregar fila';
+    document.getElementById('ml-save-label').textContent = isEdit ? 'Guardar cambios' : 'Agregar';
+    document.getElementById('ml-error').classList.add('hidden');
+
+    const sel = document.getElementById('ml-modelo');
+    sel.innerHTML = '<option value="">— Seleccionar modelo —</option>' +
+      models.map(m => `<option value="${m.id}">${m.name}</option>`).join('');
+
+    if (isEdit) {
+      sel.value = levelingRows.find(r => r.rowId === rowId).modelId;
+      onModeloSelect();
+    } else {
+      _clearLevelingPreview();
+    }
+    document.getElementById('modal-leveling').style.display = 'flex';
+  }
+
+  function closeLevelingModal() {
+    document.getElementById('modal-leveling').style.display = 'none';
+    editingRowId = null;
+  }
+
+  function onModeloSelect() {
+    const m = models.find(x => x.id === parseInt(document.getElementById('ml-modelo').value));
+    if (m) {
+      document.getElementById('ml-cliente').textContent  = m.customer;
+      document.getElementById('ml-sap').textContent      = `${m.prefix}-MOD`;
+      document.getElementById('ml-cantidad').textContent = `${m.max} uds`;
+      document.getElementById('ml-pps').textContent      = m.pps;
+    } else {
+      _clearLevelingPreview();
+    }
+  }
+
+  function _clearLevelingPreview() {
+    ['ml-cliente','ml-sap','ml-cantidad','ml-pps'].forEach(id =>
+      document.getElementById(id).textContent = '—'
+    );
+  }
+
+  function saveLevelingRow() {
+    const modelId = parseInt(document.getElementById('ml-modelo').value);
+    const errEl   = document.getElementById('ml-error');
+    if (!modelId) {
+      document.getElementById('ml-error-txt').textContent = 'Debes seleccionar un modelo.';
+      errEl.classList.remove('hidden');
+      return;
+    }
+    errEl.classList.add('hidden');
+    if (editingRowId !== null) {
+      levelingRows.find(r => r.rowId === editingRowId).modelId = modelId;
+    } else {
+      levelingRows.push({ rowId: nextRowId++, modelId, slots: TIME_SLOTS.map(() => ({ tpa: '', pool: '' })) });
+    }
+    closeLevelingModal();
+    renderLeveling(document.getElementById('main-content'));
+  }
+
+  function deleteLevelingRow(rowId) {
+    levelingRows = levelingRows.filter(r => r.rowId !== rowId);
+    renderLeveling(document.getElementById('main-content'));
+  }
+
+  function updateSlot(rowId, slotIdx, field, value) {
+    const row = levelingRows.find(r => r.rowId === rowId);
+    if (row) row.slots[slotIdx][field] = value;
+  }
+
+  // ── MONITOR DE LÍNEA ────────────────────────────────────────────────────────
+  function renderLine(container) {
+    const model = models.find(m => m.id === currentModelId);
+    let status = 'SISTEMA OK', statusColor = 'var(--status-ok)', statusBg = '#10b98115';
+    if (model.occupied <= model.limit)       { status = 'CRÍTICO: REABASTECER'; statusColor = 'var(--status-critical)'; statusBg = '#ef444415'; }
+    else if (model.occupied < model.max)     { status = 'SOLICITUD EN CURSO';   statusColor = 'var(--status-warning)';  statusBg = '#f59e0b15'; }
+
+    container.innerHTML = `
+      <div class="grid grid-cols-12 gap-3 overflow-hidden" style="height:calc(100vh - 5.5rem)">
+
+        <div class="col-span-4 flex flex-col gap-3 overflow-hidden">
+
+          <div class="bg-white rounded-xl border border-slate-200 shadow-sm px-4 py-3 shrink-0">
+            <label class="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-1.5">Modelo</label>
+            <div class="relative">
+              <select onchange="goToDetail(parseInt(this.value))"
+                class="w-full border border-slate-300 rounded-lg pl-3 pr-8 py-2 text-sm font-semibold text-[#0B3A5B] focus:border-[#339FC6] focus:ring-2 focus:ring-[#339FC6]/20 outline-none transition-all appearance-none bg-white">
+                ${models.map(m => `<option value="${m.id}" ${m.id === currentModelId ? 'selected' : ''}>${m.name}</option>`).join('')}
+              </select>
+              <div class="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-slate-400">
+                <span class="material-symbols-outlined text-[18px]">expand_more</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="bg-white rounded-xl border border-slate-200 shadow-sm p-5 flex-grow flex flex-col justify-center relative overflow-hidden">
+            <div class="absolute top-0 left-0 right-0 h-1 bg-[#339FC6] rounded-t-xl"></div>
+            <p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Honda 25SA</p>
+            <h2 class="text-3xl font-black text-[#0B3A5B] mb-0.5">${model.name}</h2>
+            <p class="text-[#339FC6] font-bold mb-6">${model.customer} Automotive</p>
+            <div class="space-y-3">
+              <div class="p-4 rounded-xl" style="background-color:${statusBg};border-left:5px solid ${statusColor}">
+                <p class="text-[10px] font-bold text-slate-500 uppercase mb-0.5">Estado Actual</p>
+                <p class="text-xl font-black" style="color:${statusColor}">${status}</p>
+              </div>
+              <div class="grid grid-cols-2 gap-3">
+                <div class="bg-slate-50 p-3 rounded-xl border border-slate-100">
+                  <p class="text-[10px] font-bold text-slate-400 uppercase mb-0.5">Piezas en Box</p>
+                  <p class="text-2xl font-black text-[#0B3A5B]">${model.occupied}<span class="text-slate-300 text-lg">/${model.max}</span></p>
+                </div>
+                <div class="bg-slate-50 p-3 rounded-xl border border-slate-100">
+                  <p class="text-[10px] font-bold text-slate-400 uppercase mb-0.5">Eficiencia</p>
+                  <p class="text-2xl font-black text-[#0B3A5B]">${Math.round((model.occupied/model.max)*100)}<span class="text-base font-bold text-slate-400">%</span></p>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="bg-[#0B3A5B] text-white p-4 rounded-xl shadow-sm shrink-0">
+            <h3 class="text-[10px] font-bold uppercase tracking-widest opacity-60 mb-3">Leyenda de Control</h3>
+            <div class="space-y-2 text-[10px]">
+              <div class="flex items-center justify-between border-b border-white/10 pb-2">
+                <div class="flex items-center gap-2"><div class="w-3 h-3 rounded-full bg-green-400"></div><span>OPTIMAL (LLENO)</span></div>
+                <span class="font-bold">MAX</span>
+              </div>
+              <div class="flex items-center justify-between border-b border-white/10 pb-2">
+                <div class="flex items-center gap-2"><div class="w-3 h-3 rounded-full bg-amber-400"></div><span>RE-ORDEN</span></div>
+                <span>> ${model.limit}</span>
+              </div>
+              <div class="flex items-center justify-between">
+                <div class="flex items-center gap-2"><div class="w-3 h-3 rounded-full bg-red-400"></div><span>CRITICAL (DESABASTO)</span></div>
+                <span>≤ ${model.limit}</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="col-span-8 bg-white rounded-xl border border-slate-200 shadow-sm p-4 h-full overflow-hidden flex flex-col">
+          <div class="flex justify-between items-center mb-2 px-1 shrink-0">
+            <h3 class="text-xs font-bold text-slate-400 uppercase tracking-wider">Secuencia Visual de Tarjetas Kanban</h3>
+            <span class="text-[10px] text-[#339FC6] font-bold">LIFO Sequence</span>
+          </div>
+          <div class="cards-grid-container">
+            ${Array.from({length: model.max}).map((_, i) => {
+              const index   = model.max - i;
+              const tarjeta = (model.tarjetas ?? []).find(t => Number(t.numero) === index);
+              const isOccupied = !!tarjeta;
+              return `
+                <div class="card-item kanban-card flex items-center border rounded-lg px-4 ${isOccupied ? 'shadow-sm border-slate-200' : 'border-dashed border-slate-100 bg-slate-50/30 opacity-40'}"
+                     style="${isOccupied ? `border-left:8px solid ${statusColor};` : ''}">
+                  <div class="w-10 h-10 rounded-lg flex items-center justify-center font-black text-sm shrink-0 ${isOccupied ? '' : 'text-slate-200'}"
+                       style="${isOccupied ? `color:${statusColor};background:${statusColor}15;` : ''}">
+                    ${index}/${model.max}
+                  </div>
+                  <div class="ml-5 flex-grow">
+                    <div class="flex items-baseline gap-2">
+                      <span class="text-[8px] font-bold text-slate-400 uppercase">Serial No.</span>
+                      <p class="font-mono text-xs font-bold ${isOccupied ? 'text-[#0B3A5B]' : 'text-slate-200'}">${isOccupied ? tarjeta.serial : 'TARJETA LIBRE'}</p>
+                    </div>
+                  </div>
+                  <div class="flex items-center gap-3">
+                    <div class="text-right">
+                      <p class="text-[8px] font-bold text-slate-400 uppercase">Status</p>
+                      <p class="text-[9px] font-black ${isOccupied ? 'text-[#0B3A5B]' : 'text-slate-300'}">${isOccupied ? tarjeta.status : 'AVAILABLE'}</p>
+                    </div>
+                    <div class="w-3 h-3 rounded-full ${isOccupied ? '' : 'border border-slate-200'}"
+                         style="background-color:${isOccupied ? statusColor : 'transparent'}"></div>
+                  </div>
+                </div>
+              `;
+            }).join('')}
+          </div>
+        </div>
+      </div>
+    `;
+    const footerModel = document.getElementById('footer-model');
+    if (footerModel) footerModel.innerText = model.name;
+  }
+
+  // ── SURTIDOR ────────────────────────────────────────────────────────────────
+  function renderSupplier(container) {
+    container.innerHTML = `
+      <div class="flex flex-col gap-3 overflow-hidden" style="height:calc(100vh - 5.5rem)">
+        <div class="flex items-center justify-between shrink-0">
+          <div>
+            <h2 class="text-lg font-bold text-[#0B3A5B]">Monitor de Modelos</h2>
+            <p class="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Honda 25SA · ${models.length} modelos activos</p>
+          </div>
+          <button onclick="openSurtirModal()"
+            class="px-4 py-2 rounded-lg bg-[#339FC6] hover:bg-[#034A77] text-white text-xs font-bold uppercase tracking-widest transition shadow-sm flex items-center gap-1.5">
+            <span class="material-symbols-outlined text-sm">local_shipping</span>Surtir Producto
+          </button>
+        </div>
+        <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-y-auto flex-grow" style="min-height:0">
+          <table class="w-full text-left">
+            <thead class="bg-slate-50 border-b border-slate-200" style="position:sticky;top:0;z-index:5">
+              <tr>
+                <th class="py-2 px-4 text-[10px] font-bold text-slate-500 uppercase tracking-wider bg-slate-50">Modelo</th>
+                <th class="py-2 px-4 text-[10px] font-bold text-slate-500 uppercase tracking-wider bg-slate-50">Ocupación del Batch</th>
+                <th class="py-2 px-4 text-[10px] font-bold text-slate-500 uppercase tracking-wider bg-slate-50">Status Logístico</th>
+                <th class="py-2 px-4 text-[10px] font-bold text-slate-500 uppercase tracking-wider text-right bg-slate-50">Acción</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-slate-100">
+              ${models.map(m => {
+                const pct = (m.occupied / m.max) * 100;
+                const isCritical = m.occupied <= m.limit;
+                const isOk = m.occupied === m.max;
+                const barColor = isCritical ? '#ef4444' : (isOk ? '#10b981' : '#f59e0b');
+                const badgeClass = isOk ? 'bg-green-100 text-green-700' : (isCritical ? 'bg-red-100 text-red-700' : 'bg-amber-100 text-amber-700');
+                const badgeText  = isOk ? 'ÓPTIMO' : (isCritical ? 'CRÍTICO' : 'RE-ORDEN');
+                return `
+                  <tr class="hover:bg-blue-50/30 transition-colors">
+                    <td class="py-3 px-4">
+                      <div class="font-bold text-sm text-[#0B3A5B]">${m.name}</div>
+                    </td>
+                    <td class="py-3 px-4 w-1/3">
+                      <div class="flex items-center gap-3">
+                        <div class="flex-grow h-2 bg-slate-100 rounded-full overflow-hidden">
+                          <div class="h-full rounded-full transition-all duration-700" style="width:${pct}%;background-color:${barColor}"></div>
+                        </div>
+                        <span class="text-xs font-bold text-[#0B3A5B]">${m.occupied}/${m.max}</span>
+                      </div>
+                    </td>
+                    <td class="py-3 px-4">
+                      <span class="px-3 py-1 rounded-full text-[10px] font-black uppercase ${badgeClass}">${badgeText}</span>
+                    </td>
+                    <td class="py-3 px-4 text-right">
+                      <button onclick="goToDetail(${m.id})"
+                        class="bg-[#0B3A5B] hover:bg-[#034A77] text-white text-[10px] px-3 py-1.5 rounded-lg font-bold transition flex items-center gap-1 ml-auto">
+                        <span class="material-symbols-outlined text-sm">open_in_new</span>VER MONITOR
+                      </button>
+                    </td>
+                  </tr>
+                `;
+              }).join('')}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    `;
+  }
+
+  // ── ADMIN ───────────────────────────────────────────────────────────────────
+  function renderAdmin(container) {
+    container.innerHTML = `
+      <div class="flex flex-col gap-3 overflow-hidden" style="height:calc(100vh - 5.5rem)">
+
+        <div class="flex items-center justify-between shrink-0">
+          <div>
+            <h2 class="text-lg font-bold text-[#0B3A5B]">Modelos disponibles</h2>
+            <p class="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Línea: Honda 25SA</p>
+          </div>
+          <button onclick="openAdminModal(null)"
+            class="px-4 py-2 rounded-lg bg-[#339FC6] hover:bg-[#034A77] text-white text-xs font-bold uppercase tracking-widest transition shadow-sm flex items-center gap-1.5">
+            <span class="material-symbols-outlined text-sm">add</span>Agregar Modelo
+          </button>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3 overflow-y-auto pb-1">
+          ${models.map(m => {
+            const pct = Math.round((m.occupied / m.max) * 100);
+            const isCritical = m.occupied <= m.limit;
+            const isOk       = m.occupied === m.max;
+            const barColor   = isCritical ? '#ef4444' : (isOk ? '#10b981' : '#f59e0b');
+            return `
+              <div class="bg-white rounded-xl border border-slate-200 shadow-sm relative overflow-hidden">
+                <div class="absolute top-0 left-0 right-0 h-1 bg-[#339FC6] rounded-t-xl"></div>
+
+                <!-- Botón editar -->
+                <button onclick="openAdminModal(${m.id})"
+                  class="absolute top-3 right-3 p-1.5 rounded-lg bg-slate-100 hover:bg-[#339FC6] hover:text-white text-slate-500 transition" title="Editar">
+                  <span class="material-symbols-outlined" style="font-size:16px">edit</span>
+                </button>
+
+                <div class="p-5 pt-4">
+                  <p class="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-0.5">Honda 25SA</p>
+                  <h3 class="font-black text-[#0B3A5B] text-base pr-8 mb-3">${m.name}</h3>
+
+                  <!-- Mini barra de ocupación -->
+                  <div class="mb-3">
+                    <div class="flex justify-between text-[9px] font-bold text-slate-400 mb-1">
+                      <span>OCUPACIÓN</span><span>${m.occupied}/${m.max}</span>
+                    </div>
+                    <div class="h-1.5 bg-slate-100 rounded-full overflow-hidden">
+                      <div class="h-full rounded-full" style="width:${pct}%;background-color:${barColor}"></div>
+                    </div>
+                  </div>
+
+                  <div class="space-y-1.5 pt-3 border-t border-slate-100">
+                    <div class="flex justify-between text-[10px] font-bold">
+                      <span class="text-slate-400 uppercase">Umbral Crítico</span>
+                      <span class="text-red-500">≤ ${m.limit} uds</span>
+                    </div>
+                    <div class="flex justify-between text-[10px] font-bold">
+                      <span class="text-slate-400 uppercase">Batch Estándar</span>
+                      <span class="text-[#0B3A5B]">${m.max} uds</span>
+                    </div>
+                    <div class="flex justify-between text-[10px] font-bold">
+                      <span class="text-slate-400 uppercase">Piezas / Pallet</span>
+                      <span class="text-[#0B3A5B]">${m.pps}</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            `;
+          }).join('')}
+        </div>
+      </div>
+    `;
+  }
+
+  // ── MODAL ADMIN ─────────────────────────────────────────────────────────────
+  function openAdminModal(id) {
+    editingAdminId = id;
+    const isEdit = id !== null;
+    document.getElementById('ma-title').textContent      = isEdit ? 'Editar Modelo' : 'Agregar Modelo';
+    document.getElementById('ma-save-label').textContent = isEdit ? 'Guardar cambios' : 'Agregar';
+    document.getElementById('ma-error').classList.add('hidden');
+
+    if (isEdit) {
+      const m = models.find(x => x.id === id);
+      document.getElementById('ma-nombre').value   = m.name;
+      document.getElementById('ma-umbral').value   = m.limit;
+      document.getElementById('ma-estandar').value = m.max;
+      document.getElementById('ma-pps').value      = m.pps;
+    } else {
+      document.getElementById('ma-nombre').value   = '';
+      document.getElementById('ma-umbral').value   = '4';
+      document.getElementById('ma-estandar').value = '12';
+      document.getElementById('ma-pps').value      = '';
+    }
+    document.getElementById('modal-admin').style.display = 'flex';
+  }
+
+  function closeAdminModal() {
+    document.getElementById('modal-admin').style.display = 'none';
+    editingAdminId = null;
+  }
+
+  function saveAdminModel() {
+    const nombre   = document.getElementById('ma-nombre').value.trim();
+    const umbral   = parseInt(document.getElementById('ma-umbral').value);
+    const estandar = parseInt(document.getElementById('ma-estandar').value);
+    const pps      = parseInt(document.getElementById('ma-pps').value);
+    const errEl    = document.getElementById('ma-error');
+    const errTxt   = document.getElementById('ma-error-txt');
+
+    if (!nombre) {
+      errTxt.textContent = 'El nombre del modelo es obligatorio.'; errEl.classList.remove('hidden'); return;
+    }
+    if (!pps || pps <= 0) {
+      errTxt.textContent = 'Las piezas por pallet deben ser mayor a 0.'; errEl.classList.remove('hidden'); return;
+    }
+    if (umbral >= estandar) {
+      errTxt.textContent = 'El umbral crítico debe ser menor al batch estándar.'; errEl.classList.remove('hidden'); return;
+    }
+    errEl.classList.add('hidden');
+
+    if (editingAdminId !== null) {
+      const m = models.find(x => x.id === editingAdminId);
+      m.name = nombre; m.limit = umbral; m.max = estandar; m.pps = pps;
+      m.quantity = pps * estandar;
+      Admin.guardarConfigModelo(editingAdminId, { nombre, umbral, estandar, pps });
+      Admin.enviarConfig(editingAdminId);
+    } else {
+      Admin.enviarNuevoModelo({ nombre, umbral, estandar, pps });
+    }
+    closeAdminModal();
+    render();
+  }
+
+  // ── Helpers ─────────────────────────────────────────────────────────────────
+  function goToDetail(id) {
+    currentModelId = id;
+    currentModule  = 'line';
+    render();
+  }
+
+  function guardarPlanLeveling() {
+    Leveling.guardar(levelingRows);
+    showToast('Plan de producción guardado correctamente');
+  }
+
+  function showToast(msg) {
+    const t = document.createElement('div');
+    t.className = 'fixed bottom-16 left-1/2 -translate-x-1/2 bg-[#0B3A5B] text-white px-6 py-3 rounded-full shadow-2xl z-[300] text-sm font-bold flex items-center gap-2';
+    t.innerHTML = `<span class="material-symbols-outlined text-sm" style='font-variation-settings:"FILL" 1'>check_circle</span>${msg}`;
+    document.body.appendChild(t);
+    setTimeout(() => t.remove(), 3000);
+  }
+
+
+  // ── MODAL SURTIR PRODUCTO ───────────────────────────────────────────────────
+  function openSurtirModal() {
+    const sel = document.getElementById('ms-modelo');
+    sel.innerHTML = models.map(m =>
+      `<option value="${m.id}">${m.name}</option>`
+    ).join('');
+    document.getElementById('ms-cantidad').value = '';
+    document.getElementById('ms-error').classList.add('hidden');
+    document.getElementById('modal-surtir').style.display = 'flex';
+  }
+
+  function closeSurtirModal() {
+    document.getElementById('modal-surtir').style.display = 'none';
+  }
+
+  async function confirmarSurtido() {
+    const modeloId = parseInt(document.getElementById('ms-modelo').value);
+    const cantidad = parseInt(document.getElementById('ms-cantidad').value);
+    const errEl    = document.getElementById('ms-error');
+    const errTxt   = document.getElementById('ms-error-txt');
+
+    if (!cantidad || cantidad <= 0) {
+      errTxt.textContent = 'La cantidad debe ser mayor a 0.';
+      errEl.classList.remove('hidden');
+      return;
+    }
+    errEl.classList.add('hidden');
+
+    const modelo = models.find(m => m.id === modeloId);
+    const payload = {
+      timestamp: new Date().toISOString(),
+      modeloId,
+      nombre:   modelo?.name ?? '',
+      cantidad
+    };
+
+    try {
+      const res = await fetch('/kanban/line/post', {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body:    JSON.stringify(payload)
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      showToast('Surtido confirmado correctamente');
+      closeSurtirModal();
+    } catch (e) {
+      errTxt.textContent = 'Error al conectar con el servidor.';
+      errEl.classList.remove('hidden');
+      console.warn('[confirmarSurtido]', e.message);
+    }
+  }
+
+  // Cerrar modales al hacer clic fuera
+  ['modal-leveling','modal-admin','modal-surtir'].forEach(id => {
+    document.getElementById(id).addEventListener('click', function(e) {
+      if (e.target === this) this.style.display = 'none';
+    });
+  });
+
+  window.onload = async () => {
+    // Admin sigue siendo la fuente de configuración de los modelos (max, umbral, pps, nombre)
+    await Admin.cargarDesdeServidor();
+
+    // ── Line y Leveling ahora se alimentan del CSV (kanbanLineCards.csv) ──────
+    // LineCards también registra en Admin los modelos nuevos del CSV (con defaults)
+    // y alimenta el "occupied" que usa el tablero Surtidor.
+    await LineCards.cargarDesdeCSV();
+
+    // ── Feeders anteriores DESACTIVADOS (Line y Leveling vienen del CSV) ──────
+    // await Leveling.cargarDesdeServidor();
+    // await LineasSurtidor.cargarDesdeServidor();
+    // LineasSurtidor.iniciarPolling();
+    // Leveling.iniciarPolling();
+
+    Admin.iniciarPolling();
+    LineCards.iniciarPolling();
+    render();
+  };
+</script>
+
+</body>
+</html>

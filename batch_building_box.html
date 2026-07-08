@@ -15,7 +15,7 @@
     --status-ok: #10b981; --status-warning: #f59e0b; --status-critical: #ef4444;
   }
   .nav-link.active { background-color: rgba(255,255,255,0.2); color: #BFEDF6; }
-  .bbb-col { min-width: 160px; }
+  .bbb-col { flex: 1 1 0; min-width: 225px; }
   .bbb-row { border: 1px solid #e2e8f0; border-radius: 0.4rem; }
   .bbb-row.pendiente { background: #f8fafc; color: #94a3b8; border-style: dashed; }
   .bbb-row.retirada  { background: #BFEDF6; color: #0B3A5B; border-color: #339FC6; }
@@ -47,28 +47,19 @@
 <main class="p-3" style="height:calc(100vh - 3rem)">
   <div class="flex flex-col gap-3 h-full">
 
-    <div class="flex justify-between items-center shrink-0 gap-3 flex-wrap">
-      <div class="flex items-center gap-3">
-        <div class="bg-red-700 text-white px-6 py-1.5 font-black text-sm tracking-widest shrink-0"
-             style="clip-path:polygon(8px 0,100% 0,calc(100% - 8px) 100%,0 100%)">
-          BATCH BUILDING BOX
-        </div>
-        <div>
-          <p id="bbb-linea" class="text-[10px] font-bold text-slate-400 uppercase tracking-wider">—</p>
-          <p class="text-xs font-bold text-[#0B3A5B]">Formador de Lotes</p>
-        </div>
+    <div class="shrink-0 pb-2 border-b-2" style="border-color:var(--nc-accent)">
+      <div class="flex items-baseline gap-3 flex-wrap">
+        <h1 class="text-xl font-black tracking-tight" style="color:var(--nc-dark)">Batch Building Box</h1>
+        <span class="text-xs font-bold text-slate-400">Formador de Lotes</span>
+        <span class="text-slate-300">·</span>
+        <span id="bbb-linea" class="text-xs font-bold text-slate-400">—</span>
       </div>
-      <div class="flex gap-2 items-center bg-white px-3 py-2 rounded-xl shadow-sm border border-slate-200 text-[9px] font-bold flex-wrap">
-        <span class="text-slate-400 uppercase tracking-wider">Leyenda</span>
-        <span class="text-slate-200">|</span>
-        <div class="flex items-center gap-1.5"><span class="w-3 h-3 rounded-sm inline-block border border-dashed border-slate-300 bg-slate-50"></span>PENDIENTE</div>
-        <span class="text-slate-200">|</span>
-        <div class="flex items-center gap-1.5"><span class="w-3 h-3 rounded-sm inline-block" style="background:#BFEDF6;border:1px solid #339FC6"></span>RETIRADA (fuera de línea)</div>
-        <span class="text-slate-200">|</span>
-        <div class="flex items-center gap-1.5"><span class="w-3 h-3 rounded-sm inline-block bg-slate-300"></span>SURTIDA a TSA/POOL</div>
-        <span class="text-slate-200">|</span>
-        <div class="flex items-center gap-1.5"><span style="color:#ef4444;font-weight:900">⟶</span>Corte de cambio de modelo</div>
-      </div>
+      <p class="text-[11px] text-slate-400 mt-0.5">
+        <span class="border border-dashed border-slate-300 px-1 rounded">vacío</span> pendiente &nbsp;·&nbsp;
+        <span class="px-1 rounded" style="background:#BFEDF6">azul</span> retirada de línea &nbsp;·&nbsp;
+        <span class="px-1 rounded bg-slate-300">gris</span> surtida a TSA/POOL &nbsp;·&nbsp;
+        <span style="color:#ef4444;font-weight:900">⟶</span> corte de cambio de modelo
+      </p>
     </div>
 
     <div id="bbb-cols" class="flex gap-3 overflow-x-auto flex-grow bg-white rounded-xl border border-slate-200 shadow-sm p-3" style="min-height:0"></div>
@@ -76,6 +67,24 @@
 </main>
 
 <script>
+  function horaSeed(n) {
+    const total = 7 * 60 + n * 6;
+    return `${String(Math.floor(total / 60)).padStart(2, '0')}:${String(total % 60).padStart(2, '0')}`;
+  }
+  function loteSeed(n, filaCambioModelo) {
+    return Math.ceil(n / filaCambioModelo);
+  }
+  function idCajaSeed(modeloId, n) {
+    return `CJ-${String(modeloId * 1000 + n).padStart(6, '0')}`;
+  }
+  function numSerieSeed(modeloId, n) {
+    return String(1000000000 + modeloId * 1000000 + n * 137).padStart(11, '0');
+  }
+  function horaAhora() {
+    const d = new Date();
+    return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+  }
+
   // ── Datos de fallback (usados cuando el servidor no responde) ─────────────────
   window.KANBAN_BATCH = {
     linea: "L-20 EM",
@@ -84,13 +93,13 @@
         filas: Array.from({length: 14}, (_, i) => {
           const n = i + 1;
           const estado = n <= 4 ? 'SURTIDA' : (n <= 7 ? 'RETIRADA' : 'PENDIENTE');
-          return { numero: n, estado, tarjeta: estado === 'PENDIENTE' ? null : { tarjetaId: `A7911-205-06-${String(n).padStart(2,'0')}`, tarjetaNum: n, tarjetaTotal: 14 } };
+          return { numero: n, estado, tarjeta: estado === 'PENDIENTE' ? null : { tarjetaId: `A7911-205-06-${String(n).padStart(2,'0')}`, tarjetaNum: n, tarjetaTotal: 14, idCaja: idCajaSeed(1, n), numSerie: numSerieSeed(1, n), hora: horaSeed(n), lote: loteSeed(n, 7) } };
         }) },
       { modeloId: 2, noParte: "A3289-742-01", filaCambioModelo: 10,
         filas: Array.from({length: 10}, (_, i) => {
           const n = i + 1;
           const estado = n <= 2 ? 'SURTIDA' : (n <= 5 ? 'RETIRADA' : 'PENDIENTE');
-          return { numero: n, estado, tarjeta: estado === 'PENDIENTE' ? null : { tarjetaId: `A3289-742-01-${String(n).padStart(2,'0')}`, tarjetaNum: n, tarjetaTotal: 10 } };
+          return { numero: n, estado, tarjeta: estado === 'PENDIENTE' ? null : { tarjetaId: `A3289-742-01-${String(n).padStart(2,'0')}`, tarjetaNum: n, tarjetaTotal: 10, idCaja: idCajaSeed(2, n), numSerie: numSerieSeed(2, n), hora: horaSeed(n), lote: loteSeed(n, 10) } };
         }) },
       { modeloId: 3, noParte: "A9442-834-00", filaCambioModelo: 8,
         filas: Array.from({length: 8}, (_, i) => ({ numero: i + 1, estado: 'PENDIENTE', tarjeta: null })) },
@@ -98,7 +107,7 @@
         filas: Array.from({length: 6}, (_, i) => {
           const n = i + 1;
           const estado = n <= 3 ? 'RETIRADA' : 'PENDIENTE';
-          return { numero: n, estado, tarjeta: estado === 'PENDIENTE' ? null : { tarjetaId: `A7460-314-06-${String(n).padStart(2,'0')}`, tarjetaNum: n, tarjetaTotal: 6 } };
+          return { numero: n, estado, tarjeta: estado === 'PENDIENTE' ? null : { tarjetaId: `A7460-314-06-${String(n).padStart(2,'0')}`, tarjetaNum: n, tarjetaTotal: 6, idCaja: idCajaSeed(4, n), numSerie: numSerieSeed(4, n), hora: horaSeed(n), lote: loteSeed(n, 6) } };
         }) }
     ]
   };
@@ -123,7 +132,11 @@
     const fila = modelo?.filas.find(f => f.numero === numeroFila);
     if (fila && fila.estado === 'PENDIENTE') {
       fila.estado = 'RETIRADA';
-      fila.tarjeta = { tarjetaId: `${modelo.noParte}-${String(numeroFila).padStart(2,'0')}`, tarjetaNum: numeroFila, tarjetaTotal: modelo.filas.length };
+      fila.tarjeta = {
+        tarjetaId: `${modelo.noParte}-${String(numeroFila).padStart(2,'0')}`, tarjetaNum: numeroFila, tarjetaTotal: modelo.filas.length,
+        idCaja: idCajaSeed(modelo.modeloId, numeroFila), numSerie: numSerieSeed(modelo.modeloId, numeroFila),
+        hora: horaAhora(), lote: loteSeed(numeroFila, modelo.filaCambioModelo)
+      };
     }
     render();
     try {
@@ -136,15 +149,49 @@
     }
   }
 
+  async function marcarSurtida(modeloId, numeroFila) {
+    const modelo = window.KANBAN_BATCH.modelos.find(m => m.modeloId === modeloId);
+    const fila = modelo?.filas.find(f => f.numero === numeroFila);
+    if (fila && fila.estado === 'RETIRADA') fila.estado = 'SURTIDA';
+    render();
+    try {
+      await fetch(BBB_API_POST, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ accion: 'marcar_surtida', modeloId, numeroFila, timestamp: new Date().toISOString() })
+      });
+    } catch (e) {
+      console.warn('[BatchBuildingBox.marcarSurtida]', e.message);
+    }
+  }
+
   function filaHtml(modelo, fila) {
     const cls = fila.estado.toLowerCase();
     const isCutoff = fila.numero === modelo.filaCambioModelo;
-    const clickable = fila.estado === 'PENDIENTE';
+    const clickable = fila.estado === 'PENDIENTE' || fila.estado === 'RETIRADA';
+    const handler = fila.estado === 'PENDIENTE'
+      ? `retirarTarjeta(${modelo.modeloId}, ${fila.numero})`
+      : (fila.estado === 'RETIRADA' ? `marcarSurtida(${modelo.modeloId}, ${fila.numero})` : '');
+    const title = fila.estado === 'PENDIENTE' ? 'Retirar tarjeta (caja sale de línea)'
+      : (fila.estado === 'RETIRADA' ? 'Marcar surtida a TSA/POOL' : '');
     return `
-      <div class="bbb-row ${cls} ${isCutoff ? 'cutoff' : ''} px-2 py-1.5 flex items-center justify-between gap-2 text-[10px] font-bold ${clickable ? 'cursor-pointer hover:brightness-95' : ''}"
-           ${clickable ? `onclick="retirarTarjeta(${modelo.modeloId}, ${fila.numero})"` : ''}>
-        <span>${fila.numero}</span>
-        <span class="font-mono">${fila.tarjeta ? `${fila.tarjeta.tarjetaNum}/${fila.tarjeta.tarjetaTotal}` : '—'}</span>
+      <div class="bbb-row ${cls} ${isCutoff ? 'cutoff' : ''} px-2 py-2.5 ${clickable ? 'cursor-pointer hover:brightness-95' : ''}"
+           title="${title}"
+           ${clickable ? `onclick="${handler}"` : ''}>
+        ${fila.tarjeta ? `
+          <div class="flex items-center justify-between gap-2 font-mono">
+            <span class="font-black text-[11px]">${fila.numero}</span>
+            <span class="font-black text-[15px]" title="ID Caja">${fila.tarjeta.idCaja}</span>
+            <span class="font-black text-[15px] opacity-90" title="Nº Serie">${fila.tarjeta.numSerie}</span>
+            <span class="font-black text-[11px]">${fila.tarjeta.tarjetaNum}/${fila.tarjeta.tarjetaTotal}</span>
+          </div>
+          <div class="flex items-center justify-between gap-2 mt-2 text-[11px] font-bold opacity-80">
+            <span class="flex items-center gap-0.5"><span class="material-symbols-outlined" style="font-size:12px">schedule</span>${fila.tarjeta.hora}</span>
+            <span>Lote ${fila.tarjeta.lote}</span>
+          </div>` : `
+          <div class="flex items-center justify-between gap-2 text-[13px] font-black">
+            <span>${fila.numero}</span>
+            <span>—</span>
+          </div>`}
       </div>`;
   }
 
@@ -153,7 +200,7 @@
     document.getElementById('bbb-linea').textContent = data.linea ?? '—';
 
     document.getElementById('bbb-cols').innerHTML = (data.modelos ?? []).map(modelo => `
-      <div class="bbb-col flex flex-col gap-2 shrink-0">
+      <div class="bbb-col flex flex-col gap-2">
         <div class="bg-[#0B3A5B] text-white text-center py-1.5 rounded-lg font-black text-[11px] uppercase tracking-wider font-mono">
           ${modelo.noParte}
         </div>
