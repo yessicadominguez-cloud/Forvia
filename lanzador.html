@@ -157,7 +157,12 @@
     document.getElementById('lz-linea').textContent = data.linea ?? '—';
     document.getElementById('lz-turno').textContent = data.turno ?? '—';
 
+    // Solo hay UNA línea física: la prioridad más baja es la que se está produciendo ahora.
+    // Las demás columnas son cola — esperan su turno, no están "en producción" todavía.
+    const prioridadActiva = Math.min(...(data.slots ?? []).map(s => s.prioridad));
+
     document.getElementById('lz-slots').innerHTML = (data.slots ?? []).map(slot => {
+      const esActiva = slot.prioridad === prioridadActiva;
       const restantes = contarTarjetasReales(slot.cola);
       const headerBg = restantes === 0 ? 'var(--status-critical)' : (restantes === 1 ? 'var(--status-warning)' : 'var(--nc-dark)');
       const aviso = restantes === 0
@@ -175,6 +180,7 @@
       <div class="slot-col flex flex-col gap-2 shrink-0">
         <div class="text-white text-center py-1.5 rounded-lg font-black text-xs uppercase tracking-widest" style="background:${headerBg}">
           Prioridad ${slot.prioridad}
+          <div class="text-[8px] font-bold tracking-normal normal-case opacity-80">${esActiva ? '● línea activa' : 'en cola'}</div>
         </div>
         <div class="flex flex-col gap-2 overflow-y-auto">
           ${aviso}
@@ -183,8 +189,11 @@
             return slot.cola.map(t => {
               if (t.tipo === 'cambio_modelo') return tarjetaHtml(t, slot.prioridad, false, '');
               posReal++;
-              const isFront = posReal === 1;
-              const ordenLabel = posReal === 2 ? 'Siguiente' : (posReal > 2 ? `En espera · turno ${posReal}` : '');
+              const isFront = esActiva && posReal === 1;
+              const ordenLabel = isFront ? ''
+                : (!esActiva && posReal === 1) ? 'Primera de esta prioridad — espera su turno'
+                : (esActiva && posReal === 2) ? 'Siguiente'
+                : `En espera · turno ${posReal}`;
               return tarjetaHtml(t, slot.prioridad, isFront, ordenLabel);
             }).join('');
           })()}
