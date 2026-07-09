@@ -53,7 +53,7 @@
         <h1 class="text-xl font-black tracking-tight" style="color:var(--nc-dark)">Batch Building Box</h1>
         <span class="text-xs font-bold text-slate-400">Formador de Lotes</span>
         <span class="text-slate-300">·</span>
-        <span id="bbb-linea" class="text-xs font-bold text-slate-400">—</span>
+        <span class="text-xs font-bold text-slate-400">Planta · Todas las líneas</span>
       </div>
       <p class="text-[11px] text-slate-400 mt-0.5">
         <span class="border border-dashed border-slate-300 px-1 rounded">vacío</span> pendiente &nbsp;·&nbsp;
@@ -87,31 +87,44 @@
   }
 
   // ── Datos de fallback (usados cuando el servidor no responde) ─────────────────
-  window.KANBAN_BATCH = {
-    linea: "L-20 EM",
+  // Cada columna (modelo) trae su propia línea: el Batch Building Box forma lotes
+  // de TODAS las líneas que atiende la ruta del mizusumashi, no solo una.
+  const FALLBACK_BATCH = {
     modelos: [
-      { modeloId: 1, noParte: "A7911-205-06", filaCambioModelo: 7,
+      { modeloId: 1, noParte: "A7911-205-06", linea: "L20EM", filaCambioModelo: 7,
         filas: Array.from({length: 14}, (_, i) => {
           const n = i + 1;
           const estado = n <= 4 ? 'SURTIDA' : (n <= 7 ? 'RETIRADA' : 'PENDIENTE');
           return { numero: n, estado, tarjeta: estado === 'PENDIENTE' ? null : { tarjetaId: `A7911-205-06-${String(n).padStart(2,'0')}`, tarjetaNum: n, tarjetaTotal: 14, idCaja: idCajaSeed(1, n), numSerie: numSerieSeed(1, n), hora: horaSeed(n), lote: loteSeed(n, 7) } };
         }) },
-      { modeloId: 2, noParte: "A3289-742-01", filaCambioModelo: 10,
+      { modeloId: 2, noParte: "A3289-742-01", linea: "L20EM", filaCambioModelo: 10,
         filas: Array.from({length: 10}, (_, i) => {
           const n = i + 1;
           const estado = n <= 2 ? 'SURTIDA' : (n <= 5 ? 'RETIRADA' : 'PENDIENTE');
           return { numero: n, estado, tarjeta: estado === 'PENDIENTE' ? null : { tarjetaId: `A3289-742-01-${String(n).padStart(2,'0')}`, tarjetaNum: n, tarjetaTotal: 10, idCaja: idCajaSeed(2, n), numSerie: numSerieSeed(2, n), hora: horaSeed(n), lote: loteSeed(n, 10) } };
         }) },
-      { modeloId: 3, noParte: "A9442-834-00", filaCambioModelo: 8,
+      { modeloId: 3, noParte: "A9442-834-00", linea: "L20EM", filaCambioModelo: 8,
         filas: Array.from({length: 8}, (_, i) => ({ numero: i + 1, estado: 'PENDIENTE', tarjeta: null })) },
-      { modeloId: 4, noParte: "A7460-314-06", filaCambioModelo: 6,
+      { modeloId: 4, noParte: "A7460-314-06", linea: "L20EM", filaCambioModelo: 6,
         filas: Array.from({length: 6}, (_, i) => {
           const n = i + 1;
           const estado = n <= 3 ? 'RETIRADA' : 'PENDIENTE';
           return { numero: n, estado, tarjeta: estado === 'PENDIENTE' ? null : { tarjetaId: `A7460-314-06-${String(n).padStart(2,'0')}`, tarjetaNum: n, tarjetaTotal: 6, idCaja: idCajaSeed(4, n), numSerie: numSerieSeed(4, n), hora: horaSeed(n), lote: loteSeed(n, 6) } };
-        }) }
+        }) },
+      { modeloId: 5, noParte: "PF8GE501BA", linea: "L-18", filaCambioModelo: 10,
+        filas: Array.from({length: 10}, (_, i) => {
+          const n = i + 1;
+          const estado = n <= 2 ? 'RETIRADA' : 'PENDIENTE';
+          return { numero: n, estado, tarjeta: estado === 'PENDIENTE' ? null : { tarjetaId: `PF8GE501BA-${String(n).padStart(2,'0')}`, tarjetaNum: n, tarjetaTotal: 10, idCaja: idCajaSeed(5, n), numSerie: numSerieSeed(5, n), hora: horaSeed(n), lote: loteSeed(n, 10) } };
+        }) },
+      { modeloId: 6, noParte: "275W74KE0A", linea: "L21EM", filaCambioModelo: 10,
+        filas: Array.from({length: 10}, (_, i) => ({ numero: i + 1, estado: 'PENDIENTE', tarjeta: null })) }
     ]
   };
+
+  // Recupera el último estado guardado (ver mock_backend.js) — así retirar/marcar
+  // surtida sobrevive a navegar a otra pantalla y volver, en vez de reiniciar al fallback.
+  window.KANBAN_BATCH = MockBackend.leerTablero('batch') ?? FALLBACK_BATCH;
 
   const BBB_API_GET  = '/kanban/batch/get';
   const BBB_API_POST = '/kanban/batch/post';
@@ -140,6 +153,7 @@
       };
       // La caja salió de línea de verdad: esto alimenta el POOL del Leveling Board.
       MockBackend.registrarProduccion(modelo.noParte, 1);
+      MockBackend.guardarTablero('batch', window.KANBAN_BATCH);
     }
     render();
     try {
@@ -155,7 +169,10 @@
   async function marcarSurtida(modeloId, numeroFila) {
     const modelo = window.KANBAN_BATCH.modelos.find(m => m.modeloId === modeloId);
     const fila = modelo?.filas.find(f => f.numero === numeroFila);
-    if (fila && fila.estado === 'RETIRADA') fila.estado = 'SURTIDA';
+    if (fila && fila.estado === 'RETIRADA') {
+      fila.estado = 'SURTIDA';
+      MockBackend.guardarTablero('batch', window.KANBAN_BATCH);
+    }
     render();
     try {
       await fetch(BBB_API_POST, {
@@ -200,12 +217,11 @@
 
   function render() {
     const data = window.KANBAN_BATCH;
-    document.getElementById('bbb-linea').textContent = data.linea ?? '—';
 
     document.getElementById('bbb-cols').innerHTML = (data.modelos ?? []).map(modelo => `
       <div class="bbb-col flex flex-col gap-2">
         <div class="bg-[#0B3A5B] text-white text-center py-1.5 rounded-lg font-black text-[11px] uppercase tracking-wider font-mono">
-          ${modelo.noParte}
+          ${modelo.noParte} <span class="font-sans opacity-70">· ${modelo.linea}</span>
         </div>
         <div class="flex flex-col gap-1 overflow-y-auto">
           ${modelo.filas.map(f => filaHtml(modelo, f)).join('')}

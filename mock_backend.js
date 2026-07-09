@@ -46,9 +46,23 @@ const MockBackend = (() => {
     return cajas;
   }
 
+  // ── Estado propio de cada tablero (Lanzador/Rack/Batch) ─────────────────────
+  // Cada pantalla es un <a href> distinto (recarga completa), así que las mutaciones
+  // en memoria (window.KANBAN_*) se pierden al navegar y volver. Se guardan aquí para
+  // que el tablero recupere su último estado en vez de reiniciar al fallback fijo.
+  function guardarTablero(nombre, data) {
+    const state = _load();
+    state.tableros = state.tableros ?? {};
+    state.tableros[nombre] = data;
+    _save(state);
+  }
+  function leerTablero(nombre) {
+    return _load().tableros?.[nombre] ?? null;
+  }
+
   function reset() {
     localStorage.removeItem(KEY);
   }
 
-  return { registrarProduccion, getProduccion, agregarCajaRack, tomarCajasRack, reset };
+  return { registrarProduccion, getProduccion, agregarCajaRack, tomarCajasRack, guardarTablero, leerTablero, reset };
 })();

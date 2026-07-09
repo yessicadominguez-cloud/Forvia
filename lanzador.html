@@ -46,7 +46,7 @@
     <div class="shrink-0 pb-2 border-b-2" style="border-color:var(--nc-accent)">
       <div class="flex items-baseline gap-3 flex-wrap">
         <h1 class="text-xl font-black tracking-tight" style="color:var(--nc-dark)">Lanzador</h1>
-        <span id="lz-linea" class="text-xs font-bold text-slate-400">—</span>
+        <span class="text-xs font-bold text-slate-400">Planta · Todas las líneas</span>
         <span class="text-slate-300">·</span>
         <span id="lz-turno" class="text-xs font-bold text-slate-400">—</span>
       </div>
@@ -62,26 +62,36 @@
 
 <script>
   // ── Datos de fallback (usados cuando el servidor no responde) ─────────────────
-  window.KANBAN_LANZADOR = {
-    linea: "L-20 EM",
+  // Cada tarjeta trae su propia línea: el Lanzador organiza tarjetas de TODAS las
+  // líneas que atiende la ruta del mizusumashi, no solo una.
+  const FALLBACK_LANZADOR = {
     turno: "1er Turno",
     slots: [
       { prioridad: 1, cola: [
-        { tarjetaId: "A7911-205-06-01", noParte: "A7911-205-06", sebango: "R3MF1-01", cliente: "Mitsuba Monterrey", clienteInterno: "TPA Mitsuba", cantidad: 40, tarjetaNum: 1, tarjetaTotal: 14, tipo: "produccion" },
-        { tarjetaId: "A7911-205-06-02", noParte: "A7911-205-06", sebango: "R3MF1-01", cliente: "Mitsuba Monterrey", clienteInterno: "TPA Mitsuba", cantidad: 40, tarjetaNum: 2, tarjetaTotal: 14, tipo: "normal" },
-        { tarjetaId: "A7911-205-06-03", noParte: "A7911-205-06", sebango: "R3MF1-01", cliente: "Mitsuba Monterrey", clienteInterno: "TPA Mitsuba", cantidad: 40, tarjetaNum: 3, tarjetaTotal: 14, tipo: "normal" },
+        { tarjetaId: "A7911-205-06-01", noParte: "A7911-205-06", linea: "L20EM", sebango: "R3MF1-01", cliente: "Mitsuba Monterrey", clienteInterno: "TPA Mitsuba", cantidad: 40, tarjetaNum: 1, tarjetaTotal: 14, tipo: "produccion" },
+        { tarjetaId: "A7911-205-06-02", noParte: "A7911-205-06", linea: "L20EM", sebango: "R3MF1-01", cliente: "Mitsuba Monterrey", clienteInterno: "TPA Mitsuba", cantidad: 40, tarjetaNum: 2, tarjetaTotal: 14, tipo: "normal" },
+        { tarjetaId: "A7911-205-06-03", noParte: "A7911-205-06", linea: "L20EM", sebango: "R3MF1-01", cliente: "Mitsuba Monterrey", clienteInterno: "TPA Mitsuba", cantidad: 40, tarjetaNum: 3, tarjetaTotal: 14, tipo: "normal" },
         { tarjetaId: "cambio-1", tipo: "cambio_modelo" },
-        { tarjetaId: "A3289-742-01-01", noParte: "A3289-742-01", sebango: "R3MF1-02", cliente: "Mitsuba Monterrey", clienteInterno: "TPA Mitsuba", cantidad: 32, tarjetaNum: 1, tarjetaTotal: 10, tipo: "normal" }
+        { tarjetaId: "A3289-742-01-01", noParte: "A3289-742-01", linea: "L20EM", sebango: "R3MF1-02", cliente: "Mitsuba Monterrey", clienteInterno: "TPA Mitsuba", cantidad: 32, tarjetaNum: 1, tarjetaTotal: 10, tipo: "normal" }
       ]},
       { prioridad: 2, cola: [
-        { tarjetaId: "A9442-834-00-01", noParte: "A9442-834-00", sebango: "R3MF1-03", cliente: "Mitsuba Monterrey", clienteInterno: "TPA Mitsuba", cantidad: 28, tarjetaNum: 1, tarjetaTotal: 8, tipo: "produccion" },
-        { tarjetaId: "A9442-834-00-02", noParte: "A9442-834-00", sebango: "R3MF1-03", cliente: "Mitsuba Monterrey", clienteInterno: "TPA Mitsuba", cantidad: 28, tarjetaNum: 2, tarjetaTotal: 8, tipo: "normal" }
+        { tarjetaId: "A9442-834-00-01", noParte: "A9442-834-00", linea: "L20EM", sebango: "R3MF1-03", cliente: "Mitsuba Monterrey", clienteInterno: "TPA Mitsuba", cantidad: 28, tarjetaNum: 1, tarjetaTotal: 8, tipo: "produccion" },
+        { tarjetaId: "A9442-834-00-02", noParte: "A9442-834-00", linea: "L20EM", sebango: "R3MF1-03", cliente: "Mitsuba Monterrey", clienteInterno: "TPA Mitsuba", cantidad: 28, tarjetaNum: 2, tarjetaTotal: 8, tipo: "normal" }
       ]},
       { prioridad: 3, cola: [
-        { tarjetaId: "A7460-314-06-01", noParte: "A7460-314-06", sebango: "R3MF1-04", cliente: "Mitsuba Monterrey", clienteInterno: "TPA Mitsuba", cantidad: 24, tarjetaNum: 1, tarjetaTotal: 6, tipo: "produccion" }
+        { tarjetaId: "A7460-314-06-01", noParte: "A7460-314-06", linea: "L20EM", sebango: "R3MF1-04", cliente: "Mitsuba Monterrey", clienteInterno: "TPA Mitsuba", cantidad: 24, tarjetaNum: 1, tarjetaTotal: 6, tipo: "produccion" }
+      ]},
+      { prioridad: 4, cola: [
+        { tarjetaId: "PF8GE501BA-01", noParte: "PF8GE501BA", linea: "L-18", sebango: "R1NS1-01", cliente: "Niss H61P", clienteInterno: "TPA Nissan", cantidad: 20, tarjetaNum: 1, tarjetaTotal: 10, tipo: "produccion" },
+        { tarjetaId: "cambio-2", tipo: "cambio_modelo" },
+        { tarjetaId: "275W74KE0A-01", noParte: "275W74KE0A", linea: "L21EM", sebango: "R2CK1-01", cliente: "AF CK HC", clienteInterno: "TPA CK", cantidad: 15, tarjetaNum: 1, tarjetaTotal: 10, tipo: "normal" }
       ]}
     ]
   };
+
+  // Recupera el último estado guardado (ver mock_backend.js) — así descartar tarjeta
+  // sobrevive a navegar a otra pantalla y volver, en vez de reiniciar al fallback.
+  window.KANBAN_LANZADOR = MockBackend.leerTablero('lanzador') ?? FALLBACK_LANZADOR;
 
   const LZ_API_GET  = '/kanban/lanzador/get';
   const LZ_API_POST = '/kanban/lanzador/post';
@@ -108,6 +118,7 @@
         sebango: tarjeta.sebango, cantidad: tarjeta.cantidad,
         tarjetaNum: tarjeta.tarjetaNum, tarjetaTotal: tarjeta.tarjetaTotal
       });
+      MockBackend.guardarTablero('lanzador', window.KANBAN_LANZADOR);
     }
     render();
     try {
@@ -133,7 +144,7 @@
         ${isFront
           ? `<div class="text-[9px] font-black uppercase tracking-wider mb-1" style="color:var(--status-ok)">● En producción</div>`
           : `<div class="text-[9px] font-black uppercase tracking-wider mb-1 text-slate-400">${ordenLabel}</div>`}
-        <p class="font-mono text-xs font-bold text-[#0B3A5B]">${t.noParte}</p>
+        <p class="font-mono text-xs font-bold text-[#0B3A5B]">${t.noParte} <span class="font-sans font-bold text-slate-400">· ${t.linea}</span></p>
         <p class="text-[9px] font-semibold text-slate-400">Sebango: ${t.sebango}</p>
         <p class="text-[9px] font-semibold text-slate-400">${t.clienteInterno}</p>
         <div class="flex justify-between items-center mt-1.5 pt-1.5 border-t border-slate-100">
@@ -154,7 +165,6 @@
 
   function render() {
     const data = window.KANBAN_LANZADOR;
-    document.getElementById('lz-linea').textContent = data.linea ?? '—';
     document.getElementById('lz-turno').textContent = data.turno ?? '—';
 
     // Solo hay UNA línea física: la prioridad más baja es la que se está produciendo ahora.

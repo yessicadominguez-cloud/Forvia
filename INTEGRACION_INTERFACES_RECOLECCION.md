@@ -85,9 +85,12 @@ Coloreo de celda en UI: verde si `tpa === pool` (a tiempo) · ámbar si difieren
 menciona el diagrama de flujo — es un estado de negocio por línea, no se recalcula solo del desfase
 TPA/POOL de una franja puntual.
 
-### `POST /kanban/leveling-planta/post` *(botón "Guardar Plan", edita TPA por franja)*
+### `POST /kanban/leveling-planta/post` *(no invocado desde ninguna pantalla actual)*
+TPA y POOL son de solo lectura en `leveling_board.html` y en el módulo Leveling de `KANBAN.html` — no hay
+botón "Guardar Plan" ni edición en línea. Este endpoint queda documentado por si una futura pantalla de
+planeación necesita escribir el TPA; hoy ningún cliente lo llama.
 ```json
-{ "fecha": "Martes 11/03/2025", "filas": [ /* mismo shape que el GET, con tpa editado */ ], "timestamp": "2026-07-08T09:00:00.000Z" }
+{ "fecha": "Martes 11/03/2025", "filas": [ /* mismo shape que el GET, con tpa actualizado */ ], "timestamp": "2026-07-08T09:00:00.000Z" }
 ```
 
 ---
@@ -95,16 +98,17 @@ TPA/POOL de una franja puntual.
 ## 2. Lanzador
 
 ### `GET /kanban/lanzador/get`
-Polling cada 5 s. Cada prioridad es una columna del casillero físico; `cola[0]` es la tarjeta en producción actual.
+Polling cada 5 s. Cada prioridad es una columna del casillero físico; `cola[0]` es la tarjeta en producción
+actual. El Lanzador es **de planta completa**, no de una sola línea: la ruta del mizusumashi organiza
+tarjetas de varias líneas en el mismo casillero, por eso `linea` vive en cada tarjeta y no como campo global.
 ```json
 {
-  "linea": "L-20 EM",
   "turno": "1er Turno",
   "slots": [
     {
       "prioridad": 1,
       "cola": [
-        { "tarjetaId": "A7911-205-06-01", "noParte": "A7911-205-06", "sebango": "R3MF1-01",
+        { "tarjetaId": "A7911-205-06-01", "noParte": "A7911-205-06", "linea": "L20EM", "sebango": "R3MF1-01",
           "cliente": "Mitsuba Monterrey", "clienteInterno": "TPA Mitsuba", "cantidad": 40,
           "tarjetaNum": 1, "tarjetaTotal": 14, "tipo": "produccion" }
       ]
@@ -125,13 +129,15 @@ Polling cada 5 s. Cada prioridad es una columna del casillero físico; `cola[0]`
 
 ### `GET /kanban/rack/get`
 Polling cada 5 s. `posiciones` sigue una secuencia LIFO igual que el resto de tableros del proyecto (posición más alta = más reciente).
+Cada columna (modelo) es de una línea distinta — el Rack es **de planta completa**, por eso `linea` vive en
+cada modelo y no como campo global.
 ```json
 {
-  "linea": "L-20 EM",
   "modelos": [
     {
       "modeloId": 1,
       "noParte": "A7911-205-06",
+      "linea": "L20EM",
       "posiciones": [
         { "posicion": 1, "estado": "ESPERANDO", "tarjeta": { "tarjetaId": "A7911-205-06-01", "sebango": "R3MF1-01", "idCaja": "CJ-001001", "numSerie": "10010001137", "cantidad": 40, "tarjetaNum": 1, "tarjetaTotal": 14, "hora": "07:08", "lote": 1 } },
         { "posicion": 2, "estado": "LIBRE", "tarjeta": null }
@@ -156,13 +162,15 @@ y el producto que trae dentro. `tarjeta.hora`: hora en que la caja quedó en esp
 
 ### `GET /kanban/batch/get`
 Polling cada 5 s. Cada modelo es una columna física; `filas` va de 1 a N (tamaño de lote), `filaCambioModelo` marca dónde ocurre el próximo corte de modelo (equivalente a la flecha en el tablero físico).
+Cada columna (modelo) es de una línea distinta — el Batch Building Box es **de planta completa**, por eso
+`linea` vive en cada modelo y no como campo global.
 ```json
 {
-  "linea": "L-20 EM",
   "modelos": [
     {
       "modeloId": 1,
       "noParte": "A7911-205-06",
+      "linea": "L20EM",
       "filaCambioModelo": 7,
       "filas": [
         { "numero": 1, "estado": "RETIRADA", "tarjeta": { "tarjetaId": "A7911-205-06-01", "idCaja": "CJ-001001", "numSerie": "10010001137", "tarjetaNum": 1, "tarjetaTotal": 14, "hora": "07:12", "lote": 1 } },
@@ -195,7 +203,7 @@ que pertenece la tarjeta dentro de ese modelo (se incrementa cada vez que se cru
 | Método | Ruta | Dirección | Disparador |
 |---|---|---|---|
 | GET  | `/kanban/leveling-planta/get` | servidor → UI | polling 5 s |
-| POST | `/kanban/leveling-planta/post` | UI → servidor | botón "Guardar Plan" (edita TPA) |
+| POST | `/kanban/leveling-planta/post` | UI → servidor | *(sin trigger actual — ver nota en sección 1)* |
 | GET  | `/kanban/lanzador/get` | servidor → UI | polling 5 s |
 | POST | `/kanban/lanzador/post` | UI → servidor | descartar tarjeta / cambio de modelo |
 | GET  | `/kanban/rack/get` | servidor → UI | polling 5 s |

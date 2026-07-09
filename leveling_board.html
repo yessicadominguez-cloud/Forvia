@@ -22,8 +22,6 @@
   .lv-cell-match     { background: #bbf7d0; color: #065f46; }
   .lv-cell-mismatch  { background: #fef08a; color: #854d0e; }
   .lv-cell-current   { outline: 2px solid var(--nc-accent); outline-offset: -2px; }
-  .tpa-input { width: 34px; border: none; text-align: center; background: transparent; font-family: inherit; font-size: 10px; font-weight: 700; }
-  .tpa-input:focus { background: #fff; outline: 1px solid var(--nc-accent); }
 </style>
 </head>
 <body>
@@ -57,11 +55,6 @@
         <span class="text-slate-200">|</span>
         <div class="flex items-center gap-1.5"><span class="w-3 h-3 rounded-full inline-block" style="background:var(--status-warning)"></span>Escalación Nivel 1 · Supervisor</div>
         <div class="flex items-center gap-1.5"><span class="w-3 h-3 rounded-full inline-block" style="background:var(--status-critical)"></span>Escalación Nivel 2 · Gerente</div>
-        <button onclick="guardarPlan()"
-          class="px-3 py-1.5 rounded-lg text-white text-[10px] font-bold uppercase tracking-widest transition flex items-center gap-1.5"
-          style="background:var(--nc-dark)" onmouseover="this.style.background='var(--nc-primary)'" onmouseout="this.style.background='var(--nc-dark)'">
-          <span class="material-symbols-outlined text-sm">save</span>Guardar Plan
-        </button>
       </div>
     </div>
 
@@ -128,8 +121,7 @@
     ]
   };
 
-  const LV_API_GET  = '/kanban/leveling-planta/get';
-  const LV_API_POST = '/kanban/leveling-planta/post';
+  const LV_API_GET = '/kanban/leveling-planta/get';
 
   async function cargarDesdeServidor() {
     try {
@@ -141,21 +133,6 @@
       console.warn('[LevelingBoard] Servidor no disponible, usando datos locales:', e.message);
     }
     render();
-  }
-
-  function updateTpa(filaIdx, slotIdx, value) {
-    window.KANBAN_LEVELING_PLANTA.filas[filaIdx].slots[slotIdx].tpa = value === '' ? 0 : Number(value);
-  }
-
-  async function guardarPlan() {
-    try {
-      await fetch(LV_API_POST, {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ fecha: window.KANBAN_LEVELING_PLANTA.fecha, filas: window.KANBAN_LEVELING_PLANTA.filas, timestamp: new Date().toISOString() })
-      });
-    } catch (e) {
-      console.warn('[LevelingBoard.guardarPlan]', e.message);
-    }
   }
 
   function sticky(leftPx, widthPx, extra = '') {
@@ -197,7 +174,7 @@
         ${TIME_SLOTS.map(() => `<th style="background:var(--nc-dark);color:#fff;width:34px;min-width:34px">TPA</th><th style="background:var(--nc-dark);color:rgba(255,255,255,.5);width:34px;min-width:34px">POOL</th>`).join('')}
       </tr>`;
 
-    const tbody = (data.filas ?? []).map((f, fi) => `
+    const tbody = (data.filas ?? []).map(f => `
       <tr class="hover:bg-blue-50/40 transition-colors">
         ${COLS.map((c, i) => `<td style="${sticky(offsets[i], c.w, 'background:#fff;' + (i === COLS.length - 1 ? 'border-right:2px solid #94a3b8' : ''))}${c.key === 'cliente' ? 'text-align:left;padding-left:6px;font-weight:700' : ''}">${c.key === 'alerta' ? escalacionBadge(f) : f[c.key]}</td>`).join('')}
         ${f.slots.map((s, si) => {
@@ -205,8 +182,7 @@
           const cls = match ? 'lv-cell-match' : 'lv-cell-mismatch';
           const cur = si === nowIdx ? 'lv-cell-current' : '';
           return `
-            <td class="${cls} ${cur}"><input class="tpa-input" type="number" min="0" value="${s.tpa}"
-              oninput="updateTpa(${fi}, ${si}, this.value)" onchange="render()"></td>
+            <td class="${cls} ${cur}">${s.tpa}</td>
             <td class="${cls} ${cur}">${s.pool}</td>`;
         }).join('')}
       </tr>`).join('');

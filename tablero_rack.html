@@ -45,7 +45,7 @@
     <div class="shrink-0 pb-2 border-b-2" style="border-color:var(--nc-accent)">
       <h1 class="text-xl font-black tracking-tight" style="color:var(--nc-dark)">Tablero de Rack</h1>
       <p class="text-[11px] text-slate-400 mt-0.5">
-        <span id="rk-linea">—</span> · cajas esperando ser surtidas, por modelo &nbsp;·&nbsp;
+        Planta · Todas las líneas · cajas esperando ser surtidas, por modelo &nbsp;·&nbsp;
         <span class="px-1 rounded border" style="border-color:var(--nc-accent)">llena</span> esperando &nbsp;·&nbsp;
         <span class="px-1 rounded border border-dashed border-slate-300">punteada</span> libre
       </p>
@@ -68,30 +68,42 @@
   }
 
   // ── Datos de fallback (usados cuando el servidor no responde) ─────────────────
-  window.KANBAN_RACK = {
-    linea: "L-20 EM",
+  // Cada columna (modelo) trae su propia línea: el Rack recibe cajas de TODAS las
+  // líneas que atiende la ruta del mizusumashi, no solo una.
+  const FALLBACK_RACK = {
     modelos: [
-      { modeloId: 1, noParte: "A7911-205-06", posiciones: Array.from({length: 8}, (_, i) => {
+      { modeloId: 1, noParte: "A7911-205-06", linea: "L20EM", posiciones: Array.from({length: 8}, (_, i) => {
           const p = i + 1;
           return p <= 3
             ? { posicion: p, estado: 'ESPERANDO', tarjeta: { tarjetaId: `A7911-205-06-0${p}`, sebango: 'R3MF1-01', cantidad: 40, tarjetaNum: p, tarjetaTotal: 14, idCaja: idCajaSeed(1, p), numSerie: numSerieSeed(1, p), hora: horaSeed(p), lote: 1 } }
             : { posicion: p, estado: 'LIBRE', tarjeta: null };
         }) },
-      { modeloId: 2, noParte: "A3289-742-01", posiciones: Array.from({length: 6}, (_, i) => {
+      { modeloId: 2, noParte: "A3289-742-01", linea: "L20EM", posiciones: Array.from({length: 6}, (_, i) => {
           const p = i + 1;
           return p <= 5
             ? { posicion: p, estado: 'ESPERANDO', tarjeta: { tarjetaId: `A3289-742-01-0${p}`, sebango: 'R3MF1-02', cantidad: 32, tarjetaNum: p, tarjetaTotal: 10, idCaja: idCajaSeed(2, p), numSerie: numSerieSeed(2, p), hora: horaSeed(p), lote: 1 } }
             : { posicion: p, estado: 'LIBRE', tarjeta: null };
         }) },
-      { modeloId: 3, noParte: "A9442-834-00", posiciones: Array.from({length: 6}, (_, i) => ({ posicion: i + 1, estado: 'LIBRE', tarjeta: null })) },
-      { modeloId: 4, noParte: "A7460-314-06", posiciones: Array.from({length: 4}, (_, i) => {
+      { modeloId: 3, noParte: "A9442-834-00", linea: "L20EM", posiciones: Array.from({length: 6}, (_, i) => ({ posicion: i + 1, estado: 'LIBRE', tarjeta: null })) },
+      { modeloId: 4, noParte: "A7460-314-06", linea: "L20EM", posiciones: Array.from({length: 4}, (_, i) => {
           const p = i + 1;
           return p === 1
             ? { posicion: p, estado: 'ESPERANDO', tarjeta: { tarjetaId: `A7460-314-06-0${p}`, sebango: 'R3MF1-04', cantidad: 24, tarjetaNum: p, tarjetaTotal: 6, idCaja: idCajaSeed(4, p), numSerie: numSerieSeed(4, p), hora: horaSeed(p), lote: 1 } }
             : { posicion: p, estado: 'LIBRE', tarjeta: null };
-        }) }
+        }) },
+      { modeloId: 5, noParte: "PF8GE501BA", linea: "L-18", posiciones: Array.from({length: 5}, (_, i) => {
+          const p = i + 1;
+          return p <= 2
+            ? { posicion: p, estado: 'ESPERANDO', tarjeta: { tarjetaId: `PF8GE501BA-0${p}`, sebango: 'R1NS1-01', cantidad: 20, tarjetaNum: p, tarjetaTotal: 10, idCaja: idCajaSeed(5, p), numSerie: numSerieSeed(5, p), hora: horaSeed(p), lote: 1 } }
+            : { posicion: p, estado: 'LIBRE', tarjeta: null };
+        }) },
+      { modeloId: 6, noParte: "275W74KE0A", linea: "L21EM", posiciones: Array.from({length: 4}, (_, i) => ({ posicion: i + 1, estado: 'LIBRE', tarjeta: null })) }
     ]
   };
+
+  // Recupera el último estado guardado (ver mock_backend.js) — así surtir sobrevive
+  // a navegar a otra pantalla y volver, en vez de reiniciar al fallback.
+  window.KANBAN_RACK = MockBackend.leerTablero('rack') ?? FALLBACK_RACK;
 
   const RK_API_GET  = '/kanban/rack/get';
   const RK_API_POST = '/kanban/rack/post';
@@ -104,9 +116,11 @@
   // Recoge las cajas que el Lanzador fue "descartando" (ver mock_backend.js) y las
   // coloca como nuevas posiciones ESPERANDO — así una acción en Lanzador se refleja aquí.
   function recibirCajasDeLanzador() {
+    let cambio = false;
     (window.KANBAN_RACK.modelos ?? []).forEach(modelo => {
       const cajas = MockBackend.tomarCajasRack(modelo.noParte);
       cajas.forEach(caja => {
+        cambio = true;
         const libre = modelo.posiciones.find(p => p.estado === 'LIBRE');
         const nuevaTarjeta = {
           sebango: caja.sebango, cantidad: caja.cantidad, tarjetaNum: caja.tarjetaNum, tarjetaTotal: caja.tarjetaTotal,
@@ -122,6 +136,7 @@
         }
       });
     });
+    if (cambio) MockBackend.guardarTablero('rack', window.KANBAN_RACK);
   }
 
   async function cargarDesdeServidor() {
@@ -140,7 +155,10 @@
   async function surtir(modeloId, posicion) {
     const modelo = window.KANBAN_RACK.modelos.find(m => m.modeloId === modeloId);
     const pos = modelo?.posiciones.find(p => p.posicion === posicion);
-    if (pos) { pos.estado = 'LIBRE'; pos.tarjeta = null; }
+    if (pos) {
+      pos.estado = 'LIBRE'; pos.tarjeta = null;
+      MockBackend.guardarTablero('rack', window.KANBAN_RACK);
+    }
     render();
     try {
       await fetch(RK_API_POST, {
@@ -186,7 +204,6 @@
 
   function render() {
     const data = window.KANBAN_RACK;
-    document.getElementById('rk-linea').textContent = data.linea ?? '—';
 
     document.getElementById('rk-cols').innerHTML = (data.modelos ?? []).map(modelo => {
       const total = modelo.posiciones.length;
@@ -202,7 +219,7 @@
       return `
         <div class="rack-col flex flex-col gap-2">
           <div class="flex justify-between items-baseline">
-            <span class="font-mono font-black text-xs" style="color:var(--nc-dark)">${modelo.noParte}</span>
+            <span class="font-mono font-black text-xs" style="color:var(--nc-dark)">${modelo.noParte} <span class="font-sans font-bold text-slate-400">· ${modelo.linea}</span></span>
             <span class="text-[9px] font-black px-1.5 py-0.5 rounded-full text-white" style="background:${pillColor}">${ocupadas}/${total}</span>
           </div>
           ${aviso}

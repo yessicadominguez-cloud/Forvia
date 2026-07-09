@@ -132,13 +132,13 @@ Polling cada 2 s. Respuesta:
 | `horasSlots` | string[] | Columnas de tiempo. Define cuántos `slots` lleva cada fila |
 | `filas[].rowId` | int | Id de la fila del tablero |
 | `filas[].modeloId` | int | Modelo de esa fila (debe existir en Admin) |
-| `slots[].tpa` | int/null | Plan (editable por el usuario) |
+| `slots[].tpa` | int/null | Plan. Solo lectura en la UI actual (número estático) |
 | `slots[].pool` | int/null | Real (solo lectura en UI). `null` = celda vacía |
 
 > El nº de elementos de `slots` debe ser igual al de `horasSlots`.
-> ⚠️ Mientras el usuario edita una celda TPA, la UI **pausa** el refresco de esa vista para no pisar lo que teclea; al salir de la celda, vuelve a refrescar.
+> TPA y POOL son ambos de solo lectura en `KANBAN.html`; no hay edición en línea ni botón "Guardar Plan".
 
-### `POST /kanban/leveling/post`  *(botón "Guardar Plan")*
+### `POST /kanban/leveling/post`  *(sin trigger actual — sin botón "Guardar Plan" en la UI)*
 ```json
 {
   "referencia": "FAU-F-PSG-4640",
@@ -164,4 +164,4 @@ Polling cada 2 s. Respuesta:
 | POST | `/kanban/modelos`       | UI → DW | (opcional, sin botón) |
 | POST | `/kanban/movimiento`    | UI → DW | (opcional, sin botón) |
 | GET  | `/kanban/leveling/get`  | DW → UI | polling 2 s |
-| POST | `/kanban/leveling/post` | UI → DW | botón "Guardar Plan" |
+| POST | `/kanban/leveling/post` | UI → DW | *(sin trigger actual — ver nota en sección 3)* |

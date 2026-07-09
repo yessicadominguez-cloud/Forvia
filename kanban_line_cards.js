@@ -164,10 +164,7 @@ const LineCards = (() => {
       await cargarDesdeCSV();
       if (typeof currentModule !== 'undefined' &&
           (currentModule === 'line' || currentModule === 'supplier' || currentModule === 'leveling')) {
-        // No re-renderizar si el usuario está editando una celda (TPA del Leveling)
-        const activo   = document.activeElement;
-        const editando = activo && activo.classList && activo.classList.contains('cell-input');
-        if (!editando) render();
+        render();
       }
     }, LINECARDS_POLL_MS);
   }
