@@ -22,9 +22,14 @@
   .lv-cell-match     { background: #bbf7d0; color: #065f46; }
   .lv-cell-mismatch  { background: #fef08a; color: #854d0e; }
   .lv-cell-current   { outline: 2px solid var(--nc-accent); outline-offset: -2px; }
+  .lv-modal-overlay {
+    position: fixed; inset: 0; background: rgba(11,58,91,0.55); z-index: 50;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .lv-modal-card { background: #fff; border-radius: 0.75rem; width: 32rem; max-width: 92vw; box-shadow: 0 20px 40px rgba(0,0,0,.25); }
   .lv-dropzone {
-    border: 1.5px dashed #94a3b8; border-radius: 0.5rem; padding: 5px 10px;
-    display: flex; align-items: center; gap: 6px; cursor: pointer; background: #fff;
+    border: 1.5px dashed #94a3b8; border-radius: 0.5rem; padding: 24px 16px;
+    display: flex; flex-direction: column; align-items: center; gap: 6px; cursor: pointer; background: #f8fafc;
     transition: background .15s ease, border-color .15s ease;
   }
   .lv-dropzone:hover, .lv-dropzone.dragover { border-color: var(--nc-accent); background: #eff8fc; }
@@ -62,11 +67,11 @@
         <div class="flex items-center gap-1.5"><span class="w-3 h-3 rounded-full inline-block" style="background:var(--status-warning)"></span>Escalación Nivel 1 · Supervisor</div>
         <div class="flex items-center gap-1.5"><span class="w-3 h-3 rounded-full inline-block" style="background:var(--status-critical)"></span>Escalación Nivel 2 · Gerente</div>
         <span class="text-slate-200">|</span>
-        <div id="lv-dropzone" class="lv-dropzone" title="Cargar TPA desde un archivo .csv">
-          <span class="material-symbols-outlined text-base" style="color:var(--nc-accent)">upload_file</span>
-          <span id="lv-dropzone-text" class="normal-case" style="font-weight:600">Arrastra o haz click para cargar TPA (.csv)</span>
-        </div>
-        <input type="file" id="lv-csv-input" accept=".csv" style="display:none"/>
+        <button onclick="abrirModalCSV()"
+          class="px-3 py-1.5 rounded-lg text-white text-[10px] font-bold uppercase tracking-widest transition flex items-center gap-1.5"
+          style="background:var(--nc-dark)" onmouseover="this.style.background='var(--nc-primary)'" onmouseout="this.style.background='var(--nc-dark)'">
+          <span class="material-symbols-outlined text-sm">upload_file</span>Cargar TPA (.csv)
+        </button>
       </div>
     </div>
 
@@ -75,6 +80,40 @@
     </div>
   </div>
 </main>
+
+<div id="lv-modal-overlay" class="lv-modal-overlay" style="display:none">
+  <div class="lv-modal-card">
+    <div class="flex items-center justify-between px-5 py-3 border-b border-slate-100">
+      <h2 class="text-sm font-black uppercase tracking-wide" style="color:var(--nc-dark)">Cargar TPA desde CSV</h2>
+      <button onclick="cerrarModalCSV()" class="text-slate-400 hover:text-slate-600">
+        <span class="material-symbols-outlined text-lg">close</span>
+      </button>
+    </div>
+    <div class="p-5">
+      <div id="lv-modal-paso-archivo">
+        <p class="text-[11px] text-slate-500 mb-3">
+          Una fila por SAP Model, una columna por franja horaria (ej. <code class="font-mono">07:00</code>).
+          Filas cuyo SAP Model no coincida con el tablero se ignoran.
+        </p>
+        <div id="lv-dropzone" class="lv-dropzone">
+          <span class="material-symbols-outlined text-3xl" style="color:var(--nc-accent)">upload_file</span>
+          <span id="lv-dropzone-text" style="font-weight:600;font-size:12px;color:var(--nc-dark)">Arrastra tu archivo .csv aquí o haz click para elegirlo</span>
+        </div>
+        <input type="file" id="lv-csv-input" accept=".csv" style="display:none"/>
+      </div>
+      <div id="lv-modal-paso-preview" style="display:none">
+        <div id="lv-preview-resumen" class="text-xs font-bold mb-2" style="color:var(--nc-dark)"></div>
+        <div id="lv-preview-detalle" class="text-[11px] text-slate-500 max-h-40 overflow-auto border border-slate-100 rounded-lg p-2"></div>
+      </div>
+    </div>
+    <div id="lv-modal-footer" class="flex justify-end gap-2 px-5 py-3 border-t border-slate-100" style="display:none">
+      <button onclick="cerrarModalCSV()" class="px-3 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-widest border border-slate-300 text-slate-500 hover:bg-slate-50">Cancelar</button>
+      <button id="lv-btn-confirmar" onclick="confirmarCargaCSV()"
+        class="px-3 py-1.5 rounded-lg text-white text-[10px] font-bold uppercase tracking-widest transition"
+        style="background:var(--status-ok)">Confirmar y aplicar</button>
+    </div>
+  </div>
+</div>
 
 <script>
   // ── Columnas fijas (sticky) a la izquierda del grid de franjas ─────────────────
@@ -209,7 +248,7 @@
     document.getElementById('lv-table').innerHTML = `<thead>${theadRow1}${theadRow2}</thead><tbody>${tbody}</tbody>`;
   }
 
-  // ── Carga de TPA desde CSV (arrastrar o hacer click) ───────────────────────────
+  // ── Carga de TPA desde CSV, con preview antes de aplicar ───────────────────────
   // Formato esperado: una fila por SAP Model, una columna por franja horaria.
   //   SAP Model,07:00,07:30,08:00,...
   //   A7911-205-06,5,3,0,...
@@ -231,53 +270,88 @@
     return out.map(s => s.trim());
   }
 
-  function dropzoneEstado(msg, ok) {
-    const el = document.getElementById('lv-dropzone-text');
-    const zona = document.getElementById('lv-dropzone');
-    el.textContent = msg;
-    zona.style.borderColor = ok ? 'var(--status-ok)' : 'var(--status-critical)';
-    setTimeout(() => {
-      el.textContent = 'Arrastra o haz click para cargar TPA (.csv)';
-      zona.style.borderColor = '';
-    }, 4000);
-  }
-
-  function aplicarCSVTPA(texto) {
+  // Solo interpreta el CSV, no toca window.KANBAN_LEVELING_PLANTA todavía.
+  function parseCSVTPA(texto) {
     const lineas = texto.split(/\r?\n/).filter(l => l.trim() !== '');
-    if (lineas.length < 2) { dropzoneEstado('CSV vacío o sin datos', false); return; }
+    if (lineas.length < 2) return { error: 'El archivo está vacío o no tiene filas de datos.' };
 
     const header = parseCSVLine(lineas[0]);
     const colSlot = header.slice(1).map(h => TIME_SLOTS.indexOf(h));
 
-    let filasActualizadas = 0, franjasActualizadas = 0;
+    const cambios = [];
+    const sapModelsEncontrados = new Set();
+    const sapModelsNoEncontrados = [];
     for (let i = 1; i < lineas.length; i++) {
       const campos = parseCSVLine(lineas[i]);
       const sapModel = campos[0];
       const fila = window.KANBAN_LEVELING_PLANTA.filas.find(f => f.sapModel === sapModel);
-      if (!fila) continue;
+      if (!fila) { if (sapModel) sapModelsNoEncontrados.push(sapModel); continue; }
+      sapModelsEncontrados.add(sapModel);
       campos.slice(1).forEach((valor, idx) => {
         const slotIdx = colSlot[idx];
         if (slotIdx === -1 || slotIdx == null || valor === '') return;
         const n = Number(valor);
         if (Number.isNaN(n)) return;
-        fila.slots[slotIdx].tpa = n;
-        franjasActualizadas++;
+        cambios.push({ fila, slotIdx, valorAnterior: fila.slots[slotIdx].tpa, valorNuevo: n });
       });
-      filasActualizadas++;
     }
 
-    if (!filasActualizadas) { dropzoneEstado('Ningún SAP Model del CSV coincide con el tablero', false); return; }
+    if (!sapModelsEncontrados.size) return { error: 'Ningún SAP Model del CSV coincide con el tablero.' };
+    return { cambios, filas: sapModelsEncontrados.size, sapModelsNoEncontrados };
+  }
+
+  let _csvPendiente = null;
+
+  function abrirModalCSV() {
+    document.getElementById('lv-modal-overlay').style.display = 'flex';
+    document.getElementById('lv-modal-paso-archivo').style.display = '';
+    document.getElementById('lv-modal-paso-preview').style.display = 'none';
+    document.getElementById('lv-modal-footer').style.display = 'none';
+    document.getElementById('lv-dropzone-text').textContent = 'Arrastra tu archivo .csv aquí o haz click para elegirlo';
+    document.getElementById('lv-dropzone').style.borderColor = '';
+  }
+
+  function cerrarModalCSV() {
+    document.getElementById('lv-modal-overlay').style.display = 'none';
+    document.getElementById('lv-csv-input').value = '';
+    _csvPendiente = null;
+  }
+
+  function mostrarErrorCSV(msg) {
+    document.getElementById('lv-dropzone-text').textContent = msg;
+    document.getElementById('lv-dropzone').style.borderColor = 'var(--status-critical)';
+  }
+
+  function previsualizarCSV(texto) {
+    const resultado = parseCSVTPA(texto);
+    if (resultado.error) { mostrarErrorCSV(resultado.error); return; }
+    if (!resultado.cambios.length) { mostrarErrorCSV('El archivo no trae franjas válidas para actualizar.'); return; }
+
+    _csvPendiente = resultado;
+    document.getElementById('lv-modal-paso-archivo').style.display = 'none';
+    document.getElementById('lv-modal-paso-preview').style.display = '';
+    document.getElementById('lv-modal-footer').style.display = 'flex';
+    document.getElementById('lv-preview-resumen').textContent =
+      `Se actualizarán ${resultado.filas} fila(s), ${resultado.cambios.length} franja(s) de TPA.`;
+    document.getElementById('lv-preview-detalle').innerHTML = resultado.sapModelsNoEncontrados.length
+      ? `<b>SAP Model no encontrados en el tablero (se ignoran):</b><br>${resultado.sapModelsNoEncontrados.join(', ')}`
+      : 'Todos los SAP Model del archivo coinciden con el tablero.';
+  }
+
+  function confirmarCargaCSV() {
+    if (!_csvPendiente) return;
+    _csvPendiente.cambios.forEach(c => { c.fila.slots[c.slotIdx].tpa = c.valorNuevo; });
     MockBackend.guardarTablero('leveling', window.KANBAN_LEVELING_PLANTA);
     render();
-    dropzoneEstado(`✓ TPA actualizado: ${filasActualizadas} filas, ${franjasActualizadas} franjas`, true);
+    cerrarModalCSV();
   }
 
   function manejarArchivo(file) {
     if (!file) return;
-    if (!file.name.toLowerCase().endsWith('.csv')) { dropzoneEstado('Solo se aceptan archivos .csv', false); return; }
+    if (!file.name.toLowerCase().endsWith('.csv')) { mostrarErrorCSV('Solo se aceptan archivos .csv'); return; }
     const reader = new FileReader();
-    reader.onload = e => aplicarCSVTPA(e.target.result);
-    reader.onerror = () => dropzoneEstado('No se pudo leer el archivo', false);
+    reader.onload = e => previsualizarCSV(e.target.result);
+    reader.onerror = () => mostrarErrorCSV('No se pudo leer el archivo.');
     reader.readAsText(file);
   }
 
