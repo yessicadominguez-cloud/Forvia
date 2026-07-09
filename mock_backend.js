@@ -31,14 +31,27 @@ const MockBackend = (() => {
 
   // ── Producción (alimenta el POOL del Leveling Board) ───────────────────────
   // Se llama cuando una caja realmente sale de línea (BBB.retirarTarjeta / Rack.surtir).
+  // Se guarda por franja de 30 min (07:00 en adelante) — no como un total suelto — para
+  // que cada retiro sume a la franja en la que realmente ocurrió, no siempre a "ahora".
+  function _slotActual() {
+    const now = new Date();
+    let diff = (now.getHours() * 60 + now.getMinutes()) - 7 * 60;
+    if (diff < 0) diff += 24 * 60;
+    return Math.floor(diff / 30);
+  }
   function registrarProduccion(noParte, cantidadCajas = 1) {
     const state = _load();
     state.produccion = state.produccion ?? {};
-    state.produccion[noParte] = (state.produccion[noParte] ?? 0) + cantidadCajas;
+    const porSlot = state.produccion[noParte] ?? {};
+    const slot = _slotActual();
+    porSlot[slot] = (porSlot[slot] ?? 0) + cantidadCajas;
+    state.produccion[noParte] = porSlot;
     _save(state);
   }
-  function getProduccion(noParte) {
-    return _load().produccion?.[noParte] ?? 0;
+  // Devuelve { slotIndex: cantidad } con lo producido hoy para ese noParte, por franja.
+  function getProduccionPorSlot(noParte) {
+    const porSlot = _load().produccion?.[noParte];
+    return (porSlot && typeof porSlot === 'object') ? porSlot : {};
   }
 
   // ── Cola de cajas nuevas para el Tablero de Rack ───────────────────────────
@@ -78,5 +91,5 @@ const MockBackend = (() => {
     localStorage.removeItem(KEY);
   }
 
-  return { registrarProduccion, getProduccion, agregarCajaRack, tomarCajasRack, guardarTablero, leerTablero, reset };
+  return { registrarProduccion, getProduccionPorSlot, agregarCajaRack, tomarCajasRack, guardarTablero, leerTablero, reset };
 })();

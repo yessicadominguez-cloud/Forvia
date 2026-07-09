@@ -159,8 +159,11 @@
     // (ver mock_backend.js) — así una acción ahí se refleja aquí sin necesitar servidor.
     (data.filas ?? []).forEach(f => {
       if (!f._poolBase) f._poolBase = f.slots.map(s => s.pool);
-      const producido = MockBackend.getProduccion(f.sapModel);
-      if (f.slots[nowIdx]) f.slots[nowIdx].pool = f._poolBase[nowIdx] + producido;
+      const producidoPorSlot = MockBackend.getProduccionPorSlot(f.sapModel);
+      f.slots.forEach((s, i) => {
+        const extra = producidoPorSlot[i] ?? 0;
+        if (extra) s.pool = f._poolBase[i] + extra;
+      });
     });
 
     const theadRow1 = `
