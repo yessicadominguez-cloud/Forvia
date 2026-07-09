@@ -182,7 +182,7 @@
           const cls = match ? 'lv-cell-match' : 'lv-cell-mismatch';
           const cur = si === nowIdx ? 'lv-cell-current' : '';
           return `
-            <td class="${cls} ${cur}">${s.tpa}</td>
+            <td class="${cls} ${cur}" style="font-weight:700">${s.tpa}</td>
             <td class="${cls} ${cur}">${s.pool}</td>`;
         }).join('')}
       </tr>`).join('');
