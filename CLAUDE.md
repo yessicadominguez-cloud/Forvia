@@ -54,9 +54,12 @@ DeviceWISE (endpoints, polling intervals, field semantics, the ÓPTIMO/RE-ORDEN/
 based on `occupied` vs `limit`/`max`).
 
 **Leveling board specifics:** `TIME_SLOTS` are 30-minute slots starting at 07:00 (wraps past midnight). Both
-TPA and POOL cells are read-only static numbers sourced from the CSV feed — there is no in-UI editing or
-"Guardar Plan" action in either `KANBAN.html` or `leveling_board.html`. Don't reintroduce an editable TPA
-cell without checking with the user.
+TPA and POOL cells are read-only static numbers — there is no in-UI cell editing or "Guardar Plan" action
+in either `KANBAN.html` or `leveling_board.html`. Don't reintroduce an editable TPA cell without checking
+with the user. In `KANBAN.html`, TPA/POOL are sourced from the live `kanbanLineCards.csv` feed (see
+`LineCards` above); in `leveling_board.html`, TPA is instead bulk-loaded via the click/drag-and-drop `.csv`
+dropzone in the header (`aplicarCSVTPA()`), which overwrites the matching rows' TPA and persists the
+result via `MockBackend.guardarTablero('leveling', ...)`.
 
 ## Architecture — Recolección screens
 

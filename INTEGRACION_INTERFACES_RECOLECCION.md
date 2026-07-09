@@ -51,7 +51,9 @@ Esto **no reemplaza** el contrato de endpoints de abajo — cuando exista servid
 
 Confirmado contra screenshot real del sistema (`Necesidad E-KANBAN.pptx.pdf`, pág. 11): el Leveling Board
 es **multi-línea** (todas las líneas de la planta en una sola tabla), con columnas fijas de identificación
-por fila y un grid de franjas de 30 min con TPA (plan, editable) y POOL (real, solo lectura) por franja.
+por fila y un grid de franjas de 30 min con TPA (plan) y POOL (real, solo lectura) por franja. TPA no se
+edita celda por celda en la UI — Planeación lo publica como `.csv` y se carga con el botón/dropzone de
+`leveling_board.html` (ver más abajo).
 
 ### `GET /kanban/leveling-planta/get`
 Polling cada 5 s.
@@ -88,10 +90,23 @@ TPA/POOL de una franja puntual.
 ### `POST /kanban/leveling-planta/post` *(no invocado desde ninguna pantalla actual)*
 TPA y POOL son de solo lectura en `leveling_board.html` y en el módulo Leveling de `KANBAN.html` — no hay
 botón "Guardar Plan" ni edición en línea. Este endpoint queda documentado por si una futura pantalla de
-planeación necesita escribir el TPA; hoy ningún cliente lo llama.
+planeación necesita escribir el TPA vía API; hoy ningún cliente lo llama.
 ```json
 { "fecha": "Martes 11/03/2025", "filas": [ /* mismo shape que el GET, con tpa actualizado */ ], "timestamp": "2026-07-08T09:00:00.000Z" }
 ```
+
+### Carga de TPA por CSV (`leveling_board.html`, solo mockup)
+Mientras no exista el endpoint anterior, `leveling_board.html` trae un botón/dropzone ("Arrastra o haz
+click para cargar TPA") que lee un `.csv` **local** (no se sube a ningún servidor) y actualiza el TPA en
+memoria + `localStorage` vía `MockBackend.guardarTablero`. Formato esperado: una fila por `sapModel`, una
+columna por franja horaria (mismo texto que las columnas visibles, ej. `07:00`, `07:30`, …):
+```csv
+SAP Model,07:00,07:30,08:00
+A7911-205-06,5,3,0
+```
+Filas cuyo `SAP Model` no coincide con ninguna fila del tablero se ignoran (se reporta el conteo en el
+mensaje de estado). No reemplaza el contrato real — cuando exista `POST /kanban/leveling-planta/post`, el
+CSV podría convertirse en el disparador que arma ese payload, pero eso no está implementado.
 
 ---
 
