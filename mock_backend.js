@@ -8,8 +8,22 @@
 const MockBackend = (() => {
   const KEY = 'KANBAN_MOCK_STATE';
 
+  // Fecha local en formato YYYY-MM-DD, para detectar cuándo cambia el día.
+  function _hoy() {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  }
+
   function _load() {
-    try { return JSON.parse(localStorage.getItem(KEY)) ?? {}; } catch { return {}; }
+    let state;
+    try { state = JSON.parse(localStorage.getItem(KEY)) ?? {}; } catch { state = {}; }
+    // El mockup no tiene servidor que resetee el turno/día — sin esto, producción,
+    // cola del rack y tableros guardados de un día anterior seguirían sumando hoy.
+    if (state._fecha !== _hoy()) {
+      state = { _fecha: _hoy() };
+      _save(state);
+    }
+    return state;
   }
   function _save(state) {
     localStorage.setItem(KEY, JSON.stringify(state));
