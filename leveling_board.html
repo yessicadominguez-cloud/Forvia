@@ -22,6 +22,12 @@
   .lv-cell-match     { background: #bbf7d0; color: #065f46; }
   .lv-cell-mismatch  { background: #fef08a; color: #854d0e; }
   .lv-cell-current   { outline: 2px solid var(--nc-accent); outline-offset: -2px; }
+  .lv-dropzone {
+    border: 1.5px dashed #94a3b8; border-radius: 0.5rem; padding: 5px 10px;
+    display: flex; align-items: center; gap: 6px; cursor: pointer; background: #fff;
+    transition: background .15s ease, border-color .15s ease;
+  }
+  .lv-dropzone:hover, .lv-dropzone.dragover { border-color: var(--nc-accent); background: #eff8fc; }
 </style>
 </head>
 <body>
@@ -55,6 +61,12 @@
         <span class="text-slate-200">|</span>
         <div class="flex items-center gap-1.5"><span class="w-3 h-3 rounded-full inline-block" style="background:var(--status-warning)"></span>Escalación Nivel 1 · Supervisor</div>
         <div class="flex items-center gap-1.5"><span class="w-3 h-3 rounded-full inline-block" style="background:var(--status-critical)"></span>Escalación Nivel 2 · Gerente</div>
+        <span class="text-slate-200">|</span>
+        <div id="lv-dropzone" class="lv-dropzone" title="Cargar TPA desde un archivo .csv">
+          <span class="material-symbols-outlined text-base" style="color:var(--nc-accent)">upload_file</span>
+          <span id="lv-dropzone-text" class="normal-case" style="font-weight:600">Arrastra o haz click para cargar TPA (.csv)</span>
+        </div>
+        <input type="file" id="lv-csv-input" accept=".csv" style="display:none"/>
       </div>
     </div>
 
@@ -104,7 +116,7 @@
   }
 
   // ── Datos de fallback (usados cuando el servidor no responde) ─────────────────
-  window.KANBAN_LEVELING_PLANTA = {
+  const FALLBACK_LEVELING = {
     fecha: 'Martes 11/03/2025',
     filas: [
       { cliente: 'PDP_2244_NISS H61P',   sapModel: 'PF8GE501BA',   linea: 'L-18',  recoleccion: 'PALLET',     piezasPorPallet: 100,  prioridad: 1, cantidad: 200,  pallets: 2.0,  horaInicio: '07:00', slots: slotsVacios({ 10: { tpa: 1, pool: 1 } }) },
@@ -120,6 +132,10 @@
       { cliente: 'PDP_2244_FORD1AUDI',   sapModel: 'PF8G8501BA',   linea: 'L-07',  recoleccion: 'PALLET',     piezasPorPallet: 64,   prioridad: 1, cantidad: 704,  pallets: 11.0, horaInicio: '07:00', slots: slotsVacios({ 4: { tpa: 1, pool: 1 }, 6: { tpa: 1, pool: 1 }, 7: { tpa: 1, pool: 0 }, 9: { tpa: 1, pool: 1 } }), nivelEscalacion: 2, escaladoA: 'Gerente de producción' }
     ]
   };
+
+  // Recupera el último estado guardado (ver mock_backend.js) — así un TPA cargado por CSV
+  // sobrevive a navegar a otra pantalla y volver, en vez de reiniciar al fallback.
+  window.KANBAN_LEVELING_PLANTA = MockBackend.leerTablero('leveling') ?? FALLBACK_LEVELING;
 
   const LV_API_GET = '/kanban/leveling-planta/get';
 
@@ -192,6 +208,90 @@
 
     document.getElementById('lv-table').innerHTML = `<thead>${theadRow1}${theadRow2}</thead><tbody>${tbody}</tbody>`;
   }
+
+  // ── Carga de TPA desde CSV (arrastrar o hacer click) ───────────────────────────
+  // Formato esperado: una fila por SAP Model, una columna por franja horaria.
+  //   SAP Model,07:00,07:30,08:00,...
+  //   A7911-205-06,5,3,0,...
+  function parseCSVLine(line) {
+    const out = []; let cur = ''; let inQ = false;
+    for (let i = 0; i < line.length; i++) {
+      const c = line[i];
+      if (inQ) {
+        if (c === '"' && line[i + 1] === '"') { cur += '"'; i++; }
+        else if (c === '"') inQ = false;
+        else cur += c;
+      } else {
+        if (c === '"') inQ = true;
+        else if (c === ',') { out.push(cur); cur = ''; }
+        else cur += c;
+      }
+    }
+    out.push(cur);
+    return out.map(s => s.trim());
+  }
+
+  function dropzoneEstado(msg, ok) {
+    const el = document.getElementById('lv-dropzone-text');
+    const zona = document.getElementById('lv-dropzone');
+    el.textContent = msg;
+    zona.style.borderColor = ok ? 'var(--status-ok)' : 'var(--status-critical)';
+    setTimeout(() => {
+      el.textContent = 'Arrastra o haz click para cargar TPA (.csv)';
+      zona.style.borderColor = '';
+    }, 4000);
+  }
+
+  function aplicarCSVTPA(texto) {
+    const lineas = texto.split(/\r?\n/).filter(l => l.trim() !== '');
+    if (lineas.length < 2) { dropzoneEstado('CSV vacío o sin datos', false); return; }
+
+    const header = parseCSVLine(lineas[0]);
+    const colSlot = header.slice(1).map(h => TIME_SLOTS.indexOf(h));
+
+    let filasActualizadas = 0, franjasActualizadas = 0;
+    for (let i = 1; i < lineas.length; i++) {
+      const campos = parseCSVLine(lineas[i]);
+      const sapModel = campos[0];
+      const fila = window.KANBAN_LEVELING_PLANTA.filas.find(f => f.sapModel === sapModel);
+      if (!fila) continue;
+      campos.slice(1).forEach((valor, idx) => {
+        const slotIdx = colSlot[idx];
+        if (slotIdx === -1 || slotIdx == null || valor === '') return;
+        const n = Number(valor);
+        if (Number.isNaN(n)) return;
+        fila.slots[slotIdx].tpa = n;
+        franjasActualizadas++;
+      });
+      filasActualizadas++;
+    }
+
+    if (!filasActualizadas) { dropzoneEstado('Ningún SAP Model del CSV coincide con el tablero', false); return; }
+    MockBackend.guardarTablero('leveling', window.KANBAN_LEVELING_PLANTA);
+    render();
+    dropzoneEstado(`✓ TPA actualizado: ${filasActualizadas} filas, ${franjasActualizadas} franjas`, true);
+  }
+
+  function manejarArchivo(file) {
+    if (!file) return;
+    if (!file.name.toLowerCase().endsWith('.csv')) { dropzoneEstado('Solo se aceptan archivos .csv', false); return; }
+    const reader = new FileReader();
+    reader.onload = e => aplicarCSVTPA(e.target.result);
+    reader.onerror = () => dropzoneEstado('No se pudo leer el archivo', false);
+    reader.readAsText(file);
+  }
+
+  const dropzone = document.getElementById('lv-dropzone');
+  const csvInput = document.getElementById('lv-csv-input');
+  dropzone.addEventListener('click', () => csvInput.click());
+  csvInput.addEventListener('change', () => manejarArchivo(csvInput.files[0]));
+  ['dragenter', 'dragover'].forEach(evt => dropzone.addEventListener(evt, e => {
+    e.preventDefault(); e.stopPropagation(); dropzone.classList.add('dragover');
+  }));
+  ['dragleave', 'drop'].forEach(evt => dropzone.addEventListener(evt, e => {
+    e.preventDefault(); e.stopPropagation(); dropzone.classList.remove('dragover');
+  }));
+  dropzone.addEventListener('drop', e => manejarArchivo(e.dataTransfer.files[0]));
 
   render();
   setInterval(cargarDesdeServidor, 5000);
